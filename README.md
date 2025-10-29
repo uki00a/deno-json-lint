@@ -1,0 +1,1 @@
+# deno-config-lint
