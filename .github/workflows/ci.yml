@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Get Deno version
+        run: |
+          echo "DENO_VERSION=$(cat .deno-version)" >> $GITHUB_ENV
+      - name: Set up Deno ${{ env.DENO_VERSION }}
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+          cache: true
+          cache-hash: ${{ hashFiles('.deno-version', 'deno.lock') }}
+      - name: Run linters
+        run: |
+          deno task check
+      - name: Run tools:typegen task
+        run: |
+          deno task tools:typegen
+          git diff --exit-code

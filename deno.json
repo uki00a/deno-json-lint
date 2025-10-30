@@ -1,0 +1,35 @@
+{
+  "exclude": ["tmp"],
+  "lint": {
+    "rules": { "include": ["no-console"] },
+    "exclude": ["generated"]
+  },
+  "fmt": { "exclude": ["generated"] },
+  "permissions": {
+    "tools:typegen": {
+      "net": ["raw.githubusercontent.com"],
+      "sys": ["cpus"],
+      "read": ["tmp"],
+      "write": ["tmp", "generated"],
+      "env": [
+        "CI",
+        "TERM",
+        "TEST_PSEUDOMAP",
+        "VERBOSE",
+        "npm_package_name",
+        "_nodeLRUCacheForceNoSymbol"
+      ]
+    }
+  },
+  "tasks": {
+    "check": {
+      "dependencies": ["check:lint", "typecheck"]
+    },
+    "check:lint": "deno lint && deno fmt --check",
+    "typecheck": "deno check tools",
+    "tools:typegen": "deno run --permission-set=tools:typegen tools/typegen.ts"
+  },
+  "imports": {
+    "json-schema-to-typescript": "npm:json-schema-to-typescript@^15.0.4"
+  }
+}
