@@ -2,10 +2,11 @@
   "exclude": ["tmp"],
   "lint": {
     "rules": { "include": ["no-console"] },
-    "exclude": ["generated"]
+    "exclude": ["generated", "testdata"]
   },
-  "fmt": { "exclude": ["generated"] },
+  "fmt": { "exclude": ["generated", "testdata"] },
   "permissions": {
+    "default": { "read": ["deno.json"] },
     "tools:typegen": {
       "net": ["raw.githubusercontent.com"],
       "sys": ["cpus"],
@@ -23,13 +24,23 @@
   },
   "tasks": {
     "check": {
-      "dependencies": ["check:lint", "typecheck"]
+      "dependencies": ["check:deno.json", "check:lint", "typecheck"]
     },
+    "check:deno.json": "deno run --permission-set src/cli.ts",
     "check:lint": "deno lint && deno fmt --check",
     "typecheck": "deno check tools",
+    "test": "deno test --permission-set tests",
     "tools:typegen": "deno run --permission-set=tools:typegen tools/typegen.ts"
   },
+  "test": {
+    "permissions": {
+      "run": ["deno"],
+      "read": ["testdata"]
+    }
+  },
   "imports": {
-    "json-schema-to-typescript": "npm:json-schema-to-typescript@^15.0.4"
+    "@std/fmt": "jsr:@std/fmt@^1.0.8",
+    "json-schema-to-typescript": "npm:json-schema-to-typescript@^15.0.4",
+    "jsonc-parser": "npm:jsonc-parser@^3.3.1"
   }
 }
