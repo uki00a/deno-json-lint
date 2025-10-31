@@ -7,7 +7,7 @@ type LintRuleTag = "recommended" | "security";
 interface LintRule {
   id: string;
   tags: Array<LintRuleTag>;
-  lint(node: Node): Diagnostic | null;
+  lint(node: Node | undefined): Diagnostic | null;
   paths(): Array<JSONPath>;
 }
 
@@ -27,10 +27,22 @@ const requireLockfile: LintRule = {
     ["lock" satisfies keyof DenoConfigurationFileSchema],
   ],
   lint(node) {
-    if (getNodeValue(node) === false) {
+    if (node != null && getNodeValue(node) === false) {
       return { message: "A lockfile should be enabled" };
     }
     return null;
+  },
+};
+const requireMinimumDependencyAge: LintRule = {
+  id: "require-minimum-dependency-age",
+  tags: ["recommended", "security"],
+  paths: () => [
+    ["minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema],
+  ],
+  lint(node) {
+    return node == null
+      ? { message: "`minimumDependencyAge` should be configured" }
+      : null;
   },
 };
 
@@ -40,11 +52,15 @@ export function lintText(
   const diagnostics: Array<Diagnostic> = [];
   const tree = parseTree(configAsText);
   if (tree == null) return [];
+  const rules = [
+    requireLockfile,
+    requireMinimumDependencyAge,
+  ];
   const rulesGroupedByPath: Record<string, {
     rules: Array<LintRule>;
     path: JSONPath;
   }> = {};
-  for (const rule of [requireLockfile]) {
+  for (const rule of rules) {
     for (const path of rule.paths()) {
       const key = JSON.stringify(path);
       rulesGroupedByPath[key] ||= { rules: [], path };
@@ -53,7 +69,6 @@ export function lintText(
   }
   for (const { rules, path } of Object.values(rulesGroupedByPath)) {
     const node = findNodeAtLocation(tree, path);
-    if (node == null) continue;
     for (const rule of rules) {
       const maybeProblem = rule.lint(node);
       if (maybeProblem) {
