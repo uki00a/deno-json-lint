@@ -6,20 +6,23 @@ Deno.test({
   fn: async (t) => {
     const decoder = new TextDecoder();
     await t.step("reports diagnostics to stderr", async () => {
+      const target = "testdata/deno.ng.json";
       const { code, stdout, stderr } = await new Deno.Command("deno", {
         args: [
           "run",
-          "--allow-read=testdata/deno.no-lock.json",
+          `--allow-read=${target}`,
           "src/cli.ts",
-          "testdata/deno.no-lock.json",
+          target,
         ],
         env: { NO_COLOR: "1" },
       }).output();
       assert.equal(code, 1);
 
       const actual = decoder.decode(stderr).trim();
-      const expected =
-        "testdata/deno.no-lock.json: [require-lockfile] A lockfile should be enabled";
+      const expected = [
+        `${target}: [require-lockfile] A lockfile should be enabled`,
+        `${target}: [require-minimum-dependency-age] \`minimumDependencyAge\` should be configured`,
+      ].join("\n");
       assert.equal(actual, expected);
 
       assert.equal(decoder.decode(stdout).trim(), "");
