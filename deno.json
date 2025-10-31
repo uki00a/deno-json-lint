@@ -28,7 +28,7 @@
     },
     "check:deno.json": "deno run --permission-set src/cli.ts",
     "check:lint": "deno lint && deno fmt --check",
-    "typecheck": "deno check tools",
+    "typecheck": "deno check tools src",
     "test": "deno test --permission-set tests",
     "tools:typegen": "deno run --permission-set=tools:typegen tools/typegen.ts"
   },

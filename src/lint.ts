@@ -1,50 +1,12 @@
-import type { JSONPath, Node } from "jsonc-parser";
-import { findNodeAtLocation, getNodeValue, parseTree } from "jsonc-parser";
-import type { DenoConfigurationFileSchema } from "../generated/config-file.v1.ts";
-
-type LintRuleTag = "recommended" | "security";
-
-interface LintRule {
-  id: string;
-  tags: Array<LintRuleTag>;
-  lint(node: Node | undefined): Diagnostic | null;
-  paths(): Array<JSONPath>;
-}
+import type { JSONPath } from "jsonc-parser";
+import { findNodeAtLocation, parseTree } from "jsonc-parser";
+import type { LintRule } from "./rules.ts";
+import { requireLockfile, requireMinimumDependencyAge } from "./rules.ts";
 
 interface Diagnostic {
   id: string;
   message: string;
 }
-
-interface LintProblem {
-  message: string;
-}
-
-const requireLockfile: LintRule = {
-  id: "require-lockfile",
-  tags: ["recommended", "security"],
-  paths: () => [
-    ["lock" satisfies keyof DenoConfigurationFileSchema],
-  ],
-  lint(node) {
-    if (node != null && getNodeValue(node) === false) {
-      return { message: "A lockfile should be enabled" };
-    }
-    return null;
-  },
-};
-const requireMinimumDependencyAge: LintRule = {
-  id: "require-minimum-dependency-age",
-  tags: ["recommended", "security"],
-  paths: () => [
-    ["minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema],
-  ],
-  lint(node) {
-    return node == null
-      ? { message: "`minimumDependencyAge` should be configured" }
-      : null;
-  },
-};
 
 export function lintText(
   configAsText: string,
