@@ -67,8 +67,14 @@ async function main({
 
     const relativePath = relative(cwd, path);
     for (const diagnostic of diagnostics) {
+      const line = diagnostic.line == null ? "" : `:${diagnostic.line}`;
+      const column = diagnostic.column == null ? "" : `:${diagnostic.column}`;
       logger.error(
-        bold(red(`${relativePath}: [${diagnostic.id}] ${diagnostic.message}`)),
+        bold(
+          red(
+            `${relativePath}${line}${column}: [${diagnostic.id}] ${diagnostic.message}`,
+          ),
+        ),
       );
     }
     return 1;
