@@ -42,7 +42,8 @@
     "@std/fmt": "jsr:@std/fmt@^1.0.8",
     "json-schema-to-typescript": "npm:json-schema-to-typescript@^15.0.4",
     "jsonc-parser": "npm:jsonc-parser@^3.3.1",
-    "lines-and-columns": "npm:lines-and-columns@^2.0.4"
+    "lines-and-columns": "npm:lines-and-columns@^2.0.4",
+    "string-argv": "npm:string-argv@^0.3.2"
   },
   "minimumDependencyAge": 1440
 }
