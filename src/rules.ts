@@ -1,7 +1,10 @@
 import { parseArgsStringToArgv } from "string-argv";
 import type { JSONPath, Node } from "jsonc-parser";
 import { getNodePath, getNodeValue } from "jsonc-parser";
-import type { DenoConfigurationFileSchema } from "../generated/config-file.v1.ts";
+import type {
+  DenoConfigurationFileSchema,
+  PermissionSet,
+} from "../generated/config-file.v1.ts";
 
 type LintRuleTag =
   | "recommended"
@@ -30,12 +33,14 @@ type TaskDefinition = Exclude<
   string
 >;
 
+const kPermissions = "permissions" satisfies keyof DenoConfigurationFileSchema;
+
 export const banAllowAll: LintRule = {
   id: "ban-allow-all",
   tags: ["recommended", "security", "permissions"],
   paths: () => [
-    // TODO: Support `permissions`
     [kTasks],
+    [kPermissions],
   ],
   lint(reporter, node) {
     if (node == null) {
@@ -67,6 +72,46 @@ export const banAllowAll: LintRule = {
             node: taskNode,
             message: `${flagsToBan.join("/")} should not be used`,
           });
+        }
+      }
+    } else if (path[0] === kPermissions && node.type === "object") {
+      for (
+        let i = 0, length = node.children?.length ?? 0;
+        i < length;
+        i++
+      ) {
+        const propertyNode = node.children?.[i];
+        if (propertyNode == null) continue;
+        if (propertyNode.type !== "property") continue;
+
+        const [, permissionSetNode] = propertyNode.children ?? [];
+        if (permissionSetNode == null) continue;
+        if (permissionSetNode.type !== "object") continue;
+        for (
+          let j = 0, length = permissionSetNode.children?.length ?? 0;
+          j < length;
+          j++
+        ) {
+          const propertyNode = permissionSetNode.children?.[j];
+          if (propertyNode == null) continue;
+          if (propertyNode.type !== "property") continue;
+          const [permissionKindNode, permissionConfigNode] =
+            propertyNode.children ?? [];
+          if (permissionKindNode == null) continue;
+          if (permissionConfigNode == null) continue;
+
+          const permissionKind: keyof PermissionSet | null = getNodeValue(
+            permissionKindNode,
+          );
+          if (permissionKind !== "all") continue;
+
+          const permissionConfig = getNodeValue(permissionConfigNode);
+          if (permissionConfig === true) {
+            reporter.report({
+              node: permissionConfigNode,
+              message: `\`all: true\` should not be used`,
+            });
+          }
         }
       }
     }
