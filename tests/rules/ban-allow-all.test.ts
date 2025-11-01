@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { lintText } from "../src/lint.ts";
 
 Deno.test({
-  name: "lintText()",
+  name: "ban-allow-all",
   permissions: "none",
   fn: async (t) => {
-    await t.step("ban-allow-all", () => {
+    await t.step("reports the use of --allow-all in tasks", () => {
       const actual = lintText(
         `{
   "tasks": {
