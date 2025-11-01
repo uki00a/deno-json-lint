@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lintText } from "../src/lint.ts";
+import { lintText } from "../../src/lint.ts";
 
 Deno.test({
   name: "ban-allow-all",
@@ -34,6 +34,27 @@ Deno.test({
           message: "--allow-all/-A should not be used",
           line: 8,
           column: 19,
+        },
+      ];
+      assert.deepEqual(actual, expected);
+    });
+
+    await t.step("reports the use of `all: true` in permissions", () => {
+      const actual = lintText(
+        `{
+  "permissions": {
+    "ok": { "read": true, "all": false },
+    "ng": { "all": true }
+  }
+}`,
+        { include: ["ban-allow-all"] },
+      );
+      const expected = [
+        {
+          id: "ban-allow-all",
+          message: "`all: true` should not be used",
+          line: 4,
+          column: 20,
         },
       ];
       assert.deepEqual(actual, expected);
