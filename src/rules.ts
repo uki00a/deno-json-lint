@@ -34,6 +34,9 @@ type TaskDefinition = Exclude<
 >;
 
 const kPermissions = "permissions" satisfies keyof DenoConfigurationFileSchema;
+const kCompile = "compile" satisfies keyof DenoConfigurationFileSchema;
+const kTest = "test" satisfies keyof DenoConfigurationFileSchema;
+const kBench = "bench" satisfies keyof DenoConfigurationFileSchema;
 
 export const banAllowAll: LintRule = {
   id: "ban-allow-all",
@@ -41,6 +44,9 @@ export const banAllowAll: LintRule = {
   paths: () => [
     [kTasks],
     [kPermissions],
+    [kBench, kPermissions],
+    [kCompile, kPermissions],
+    [kTest, kPermissions],
   ],
   lint(reporter, node) {
     if (node == null) {
@@ -86,36 +92,46 @@ export const banAllowAll: LintRule = {
 
         const [, permissionSetNode] = propertyNode.children ?? [];
         if (permissionSetNode == null) continue;
-        if (permissionSetNode.type !== "object") continue;
-        for (
-          let j = 0, length = permissionSetNode.children?.length ?? 0;
-          j < length;
-          j++
-        ) {
-          const propertyNode = permissionSetNode.children?.[j];
-          if (propertyNode == null) continue;
-          if (propertyNode.type !== "property") continue;
-          const [permissionKindNode, permissionConfigNode] =
-            propertyNode.children ?? [];
-          if (permissionKindNode == null) continue;
-          if (permissionConfigNode == null) continue;
+        lintPermissionSet(permissionSetNode);
+      }
+    } else if (
+      (path[0] === kBench || path[0] === kCompile || path[0] === kTest) &&
+      path[1] === kPermissions &&
+      node.type === "object"
+    ) {
+      lintPermissionSet(node);
+    }
+    return null;
 
-          const permissionKind: keyof PermissionSet | null = getNodeValue(
-            permissionKindNode,
-          );
-          if (permissionKind !== "all") continue;
+    function lintPermissionSet(permissionSetNode: Node): void {
+      if (permissionSetNode.type !== "object") return;
+      for (
+        let j = 0, length = permissionSetNode.children?.length ?? 0;
+        j < length;
+        j++
+      ) {
+        const propertyNode = permissionSetNode.children?.[j];
+        if (propertyNode == null) continue;
+        if (propertyNode.type !== "property") continue;
+        const [permissionKindNode, permissionConfigNode] =
+          propertyNode.children ?? [];
+        if (permissionKindNode == null) continue;
+        if (permissionConfigNode == null) continue;
 
-          const permissionConfig = getNodeValue(permissionConfigNode);
-          if (permissionConfig === true) {
-            reporter.report({
-              node: permissionConfigNode,
-              message: `\`all: true\` should not be used`,
-            });
-          }
+        const permissionKind: keyof PermissionSet | null = getNodeValue(
+          permissionKindNode,
+        );
+        if (permissionKind !== "all") continue;
+
+        const permissionConfig = getNodeValue(permissionConfigNode);
+        if (permissionConfig === true) {
+          reporter.report({
+            node: permissionConfigNode,
+            message: `\`all: true\` should not be used`,
+          });
         }
       }
     }
-    return null;
   },
 };
 export const requireLockfile: LintRule = {

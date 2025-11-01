@@ -59,5 +59,46 @@ Deno.test({
       ];
       assert.deepEqual(actual, expected);
     });
+
+    await t.step(
+      "reports the use of `all: true` in {bench,compile,test}.permissions",
+      () => {
+        const actual = lintText(
+          `{
+  "bench": {
+    "permissions": { "all": true }
+  },
+  "compile": {
+    "permissions": { "all": true }
+  },
+  "test": {
+    "permissions": { "all": true }
+  }
+}`,
+          { include: ["ban-allow-all"] },
+        );
+        const expected = [
+          {
+            id: "ban-allow-all",
+            message: "`all: true` should not be used",
+            line: 3,
+            column: 29,
+          },
+          {
+            id: "ban-allow-all",
+            message: "`all: true` should not be used",
+            line: 6,
+            column: 29,
+          },
+          {
+            id: "ban-allow-all",
+            message: "`all: true` should not be used",
+            line: 9,
+            column: 29,
+          },
+        ];
+        assert.deepEqual(actual, expected);
+      },
+    );
   },
 });
