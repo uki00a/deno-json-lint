@@ -4,6 +4,7 @@ import { LinesAndColumns } from "lines-and-columns";
 import type { LintReporter, LintRule } from "./rules.ts";
 import {
   banAllowAll,
+  requireAllowList,
   requireLockfile,
   requireMinimumDependencyAge,
 } from "./rules.ts";
@@ -28,6 +29,7 @@ export function lintText(
   const lines = new LinesAndColumns(configAsText);
   const rules = determineRules([
     banAllowAll,
+    requireAllowList,
     requireLockfile,
     requireMinimumDependencyAge,
   ], options);

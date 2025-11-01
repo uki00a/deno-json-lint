@@ -55,31 +55,17 @@ export const banAllowAll: LintRule = {
     const flagsToBan = ["--allow-all", "-A"];
     const path = getNodePath(node);
     if (path[0] === kTasks && node.type === "object") {
-      for (
-        let i = 0, length = node.children?.length ?? 0;
-        i < length;
-        i++
-      ) {
-        const propertyNode = node.children?.[i];
-        if (propertyNode == null) continue;
-        if (propertyNode.type !== "property") continue;
-
-        const [, taskNode] = propertyNode.children ?? [];
-        if (taskNode == null) continue;
-        if (taskNode.type !== "string" && taskNode.type !== "object") continue;
-        const taskNodeValue = getNodeValue(taskNode);
-        const task = typeof taskNodeValue === "object"
-          ? (taskNodeValue as TaskDefinition).command
-          : taskNodeValue as string;
-        if (task == null) continue;
-        const args = parseArgsStringToArgv(task);
+      walkTaskValueNodes(node, (taskValueNode) => {
+        const command = getCommandFromTaskValueNode(taskValueNode);
+        if (command == null) return;
+        const args = parseArgsStringToArgv(command);
         if (args.some((x) => flagsToBan.includes(x))) {
           reporter.report({
-            node: taskNode,
+            node: taskValueNode,
             message: `${flagsToBan.join("/")} should not be used`,
           });
         }
-      }
+      });
     } else if (path[0] === kPermissions && node.type === "object") {
       for (
         let i = 0, length = node.children?.length ?? 0;
@@ -134,6 +120,63 @@ export const banAllowAll: LintRule = {
     }
   },
 };
+export const requireAllowList: LintRule = {
+  id: "require-allow-list",
+  tags: ["recommended", "security", "permissions"],
+  paths: () => [
+    [kTasks],
+  ],
+  lint(reporter, node) {
+    if (node == null) return;
+    const path = getNodePath(node);
+    if (path[0] === kTasks && node.type === "object") {
+      const shortAllowFlags = {
+        "read": "R",
+        "write": "W",
+        "import": "I",
+        "env": "E",
+        "net": "N",
+        "run": undefined,
+        "ffi": undefined,
+        "sys": "S",
+      } satisfies {
+        [Kind in Exclude<keyof PermissionSet, "all">]: string | undefined;
+      };
+      const permissionKinds = keys(shortAllowFlags);
+
+      walkTaskValueNodes(node, (taskValueNode) => {
+        const command = getCommandFromTaskValueNode(taskValueNode);
+        if (command == null) return;
+        const args = parseArgsStringToArgv(command);
+        const found = args.reduce(
+          (
+            found: Set<Exclude<keyof PermissionSet, "all">>,
+            arg: string,
+          ) => {
+            if (!arg.startsWith("-")) return found;
+            const kind = permissionKinds.find((kind) => {
+              const shortFlag = shortAllowFlags[kind];
+              const isAllowFlag = arg.startsWith(`--allow-${kind}`) ||
+                (shortFlag && arg.startsWith(`-${shortFlag}`));
+              return isAllowFlag && !arg.includes("=");
+            });
+            if (kind) found.add(kind);
+            return found;
+          },
+          new Set(),
+        );
+        if (found.size > 0) {
+          reporter.report({
+            node: taskValueNode,
+            message: `An allow list should be specified for ${
+              Array.from(found).map((x) => `--allow-${x}`).join(", ")
+            }`,
+          });
+        }
+      });
+    }
+  },
+};
 export const requireLockfile: LintRule = {
   id: "require-lockfile",
   tags: ["recommended", "security"],
@@ -162,3 +205,36 @@ export const requireMinimumDependencyAge: LintRule = {
     }
   },
 };
+
+function walkTaskValueNodes(
+  tasksNode: Node,
+  visitor: (taskValueNode: Node) => void,
+): void {
+  for (
+    let i = 0, length = tasksNode.children?.length ?? 0;
+    i < length;
+    i++
+  ) {
+    const propertyNode = tasksNode.children?.[i];
+    if (propertyNode == null) continue;
+    if (propertyNode.type !== "property") continue;
+
+    const [, taskValueNode] = propertyNode.children ?? [];
+    if (taskValueNode == null) continue;
+    if (taskValueNode.type !== "string" && taskValueNode.type !== "object") {
+      continue;
+    }
+    visitor(taskValueNode);
+  }
+}
+
+function getCommandFromTaskValueNode(taskValueNode: Node): string | undefined {
+  const task = getNodeValue(taskValueNode);
+  return typeof task === "object"
+    ? (task as TaskDefinition).command
+    : task as string;
+}
+
+function keys<T extends Record<string, unknown>>(object: T): Array<keyof T> {
+  return Object.keys(object) as Array<keyof T>;
+}
