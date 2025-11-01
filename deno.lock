@@ -5,7 +5,8 @@
     "npm:@types/node@*": "24.2.0",
     "npm:json-schema-to-typescript@^15.0.4": "15.0.4",
     "npm:jsonc-parser@^3.3.1": "3.3.1",
-    "npm:lines-and-columns@^2.0.4": "2.0.4"
+    "npm:lines-and-columns@^2.0.4": "2.0.4",
+    "npm:string-argv@~0.3.2": "0.3.2"
   },
   "jsr": {
     "@std/fmt@1.0.8": {
@@ -98,6 +99,9 @@
       "integrity": "sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==",
       "bin": true
     },
+    "string-argv@0.3.2": {
+      "integrity": "sha512-aqD2Q0144Z+/RqG52NeHEkZauTAUWJO8c6yTftGJKO3Tja5tUgIfmIl6kExvhtxSDP7fXB6DvzkfMpCd/F3G+Q=="
+    },
     "tinyglobby@0.2.15_picomatch@4.0.3": {
       "integrity": "sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==",
       "dependencies": [
@@ -114,7 +118,8 @@
       "jsr:@std/fmt@^1.0.8",
       "npm:json-schema-to-typescript@^15.0.4",
       "npm:jsonc-parser@^3.3.1",
-      "npm:lines-and-columns@^2.0.4"
+      "npm:lines-and-columns@^2.0.4",
+      "npm:string-argv@~0.3.2"
     ]
   }
 }
