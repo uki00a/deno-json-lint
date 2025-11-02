@@ -104,5 +104,76 @@ Deno.test({
         assert.deepEqual(actual, expected);
       },
     );
+
+    await t.step(
+      "supports `permissions` field",
+      () => {
+        const actual = lintText(
+          `{
+  "permissions": {
+    "ok": { "all": true, "read": ["testdata"] },
+    "ng": { "read": true, "sys": true }
+  }
+}`,
+          { include: ["require-allow-list"] },
+        );
+        const expected = [
+          {
+            id: "require-allow-list",
+            message: "An allow list should be specified",
+            line: 4,
+            column: 21,
+          },
+          {
+            id: "require-allow-list",
+            message: "An allow list should be specified",
+            line: 4,
+            column: 34,
+          },
+        ];
+        assert.deepEqual(actual, expected);
+      },
+    );
+
+    await t.step(
+      "supports `{bench,compile,test}.permissions` fields",
+      () => {
+        const actual = lintText(
+          `{
+  "bench": {
+    "permissions": { "write": true }
+  },
+  "compile": {
+    "permissions": { "ffi": true }
+  },
+  "test": {
+    "permissions": { "net": true }
+  }
+}`,
+          { include: ["require-allow-list"] },
+        );
+        const expected = [
+          {
+            id: "require-allow-list",
+            message: "An allow list should be specified",
+            line: 3,
+            column: 31,
+          },
+          {
+            id: "require-allow-list",
+            message: "An allow list should be specified",
+            line: 6,
+            column: 29,
+          },
+          {
+            id: "require-allow-list",
+            message: "An allow list should be specified",
+            line: 9,
+            column: 29,
+          },
+        ];
+        assert.deepEqual(actual, expected);
+      },
+    );
   },
 });
