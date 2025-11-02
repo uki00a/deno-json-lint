@@ -34,3 +34,8 @@ jobs:
           git diff --exit-code
       - name: Run tests
         run: deno task test
+      - name: Run e2e tests
+        run: |
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          NO_COLOR=1 deno task test:e2e 2>> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
