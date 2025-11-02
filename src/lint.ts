@@ -67,6 +67,29 @@ export function lintText(
       rule.lint(reporter, node);
     }
   }
+  diagnostics.sort((a, b) => {
+    if (a.line == null) {
+      if (b.line == null) return a.id < b.id ? -1 : 1;
+      else return -1;
+    } else if (b.line == null) {
+      return 1;
+    } else if (a.line === b.line) {
+      if (a.column != null && b.column != null) {
+        const cmp = a.column - b.column;
+        if (cmp === 0) {
+          return a.id < b.id ? -1 : 1;
+        } else {
+          return cmp;
+        }
+      } else {
+        const cmp = (a.column ?? 0) - (b.column ?? 0);
+        if (cmp === 0) return a.id < b.id ? -1 : 1;
+        else return cmp;
+      }
+    } else {
+      return a.line - b.line;
+    }
+  });
   return diagnostics;
 }
 
