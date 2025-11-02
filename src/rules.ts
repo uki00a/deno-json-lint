@@ -232,6 +232,7 @@ export const requireLockfile: LintRule = {
     if (node != null && getNodeValue(node) === false) {
       reporter.report({
         message: "A lockfile should be enabled",
+        node,
       });
     }
   },
