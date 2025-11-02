@@ -38,6 +38,9 @@ const kCompile = "compile" satisfies keyof DenoConfigurationFileSchema;
 const kTest = "test" satisfies keyof DenoConfigurationFileSchema;
 const kBench = "bench" satisfies keyof DenoConfigurationFileSchema;
 
+/**
+ * Disallows the use of `--allow-all`.
+ */
 export const banAllowAll: LintRule = {
   id: "ban-allow-all",
   tags: ["recommended", "security", "permissions"],
@@ -110,6 +113,10 @@ export const banAllowAll: LintRule = {
     }
   },
 };
+
+/**
+ * Enforces that `--allow-*` flag to have an allow list.
+ */
 export const requireAllowList: LintRule = {
   id: "require-allow-list",
   tags: ["recommended", "security", "permissions"],
@@ -211,6 +218,10 @@ export const requireAllowList: LintRule = {
     }
   },
 };
+
+/**
+ * Enforces that a lockfile to be enabled.
+ */
 export const requireLockfile: LintRule = {
   id: "require-lockfile",
   tags: ["recommended", "security"],
@@ -225,6 +236,10 @@ export const requireLockfile: LintRule = {
     }
   },
 };
+
+/**
+ * Enforces that `minimumDependencyAge` to be configured.
+ */
 export const requireMinimumDependencyAge: LintRule = {
   id: "require-minimum-dependency-age",
   tags: ["recommended", "security"],
