@@ -21,6 +21,10 @@
         "npm_package_name",
         "_nodeLRUCacheForceNoSymbol"
       ]
+    },
+    "tools:generate-rules-md": {
+      "run": ["deno"],
+      "write": ["docs/rules.md"]
     }
   },
   "tasks": {
@@ -32,7 +36,8 @@
     "typecheck": "deno check tools src",
     "test": "deno test --permission-set tests",
     "test:e2e": "! deno run --permission-set=test:e2e src/cli.ts testdata/deno.e2e.json",
-    "tools:typegen": "deno run --permission-set=tools:typegen tools/typegen.ts"
+    "tools:typegen": "deno run --permission-set=tools:typegen tools/typegen.ts",
+    "tools:generate-rules-md": "deno run --permission-set=tools:generate-rules-md tools/generate-rules-md.ts && deno fmt docs/rules.md"
   },
   "test": {
     "permissions": {

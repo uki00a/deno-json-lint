@@ -32,6 +32,10 @@ jobs:
         run: |
           deno task tools:typegen
           git diff --exit-code
+      - name: Run tools:generate-rules-md task
+        run: |
+          deno task tools:generate-rules-md
+          git diff --exit-code
       - name: Run tests
         run: deno task test
       - name: Run e2e tests
