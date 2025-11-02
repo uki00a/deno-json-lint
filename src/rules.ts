@@ -67,19 +67,9 @@ export const banAllowAll: LintRule = {
         }
       });
     } else if (path[0] === kPermissions && node.type === "object") {
-      for (
-        let i = 0, length = node.children?.length ?? 0;
-        i < length;
-        i++
-      ) {
-        const propertyNode = node.children?.[i];
-        if (propertyNode == null) continue;
-        if (propertyNode.type !== "property") continue;
-
-        const [, permissionSetNode] = propertyNode.children ?? [];
-        if (permissionSetNode == null) continue;
+      walkPermissionSetNodes(node, (permissionSetNode) => {
         lintPermissionSet(permissionSetNode);
-      }
+      });
     } else if (
       (path[0] === kBench || path[0] === kCompile || path[0] === kTest) &&
       path[1] === kPermissions &&
@@ -125,6 +115,10 @@ export const requireAllowList: LintRule = {
   tags: ["recommended", "security", "permissions"],
   paths: () => [
     [kTasks],
+    [kPermissions],
+    [kBench, kPermissions],
+    [kCompile, kPermissions],
+    [kTest, kPermissions],
   ],
   lint(reporter, node) {
     if (node == null) return;
@@ -174,6 +168,46 @@ export const requireAllowList: LintRule = {
           });
         }
       });
+    } else if (path[0] === kPermissions && node.type === "object") {
+      walkPermissionSetNodes(node, (permissionSetNode) => {
+        lintPermissionSet(permissionSetNode);
+      });
+    } else if (
+      (path[0] === kBench || path[0] === kCompile || path[0] === kTest) &&
+      path[1] === kPermissions &&
+      node.type === "object"
+    ) {
+      lintPermissionSet(node);
+    }
+
+    function lintPermissionSet(permissionSetNode: Node): void {
+      if (permissionSetNode.type !== "object") return;
+      for (
+        let j = 0, length = permissionSetNode.children?.length ?? 0;
+        j < length;
+        j++
+      ) {
+        const propertyNode = permissionSetNode.children?.[j];
+        if (propertyNode == null) continue;
+        if (propertyNode.type !== "property") continue;
+        const [permissionKindNode, permissionConfigNode] =
+          propertyNode.children ?? [];
+        if (permissionKindNode == null) continue;
+        if (permissionConfigNode == null) continue;
+
+        const permissionKind: keyof PermissionSet | null = getNodeValue(
+          permissionKindNode,
+        );
+        if (permissionKind === "all") continue;
+
+        const permissionConfig = getNodeValue(permissionConfigNode);
+        if (permissionConfig === true) {
+          reporter.report({
+            node: permissionConfigNode,
+            message: `An allow list should be specified`,
+          });
+        }
+      }
     }
   },
 };
@@ -205,6 +239,25 @@ export const requireMinimumDependencyAge: LintRule = {
     }
   },
 };
+
+function walkPermissionSetNodes(
+  permissionsNode: Node,
+  visitor: (permissionSetNode: Node) => void,
+): void {
+  for (
+    let i = 0, length = permissionsNode.children?.length ?? 0;
+    i < length;
+    i++
+  ) {
+    const propertyNode = permissionsNode.children?.[i];
+    if (propertyNode == null) continue;
+    if (propertyNode.type !== "property") continue;
+
+    const [, permissionSetNode] = propertyNode.children ?? [];
+    if (permissionSetNode == null) continue;
+    visitor(permissionSetNode);
+  }
+}
 
 function walkTaskValueNodes(
   tasksNode: Node,
