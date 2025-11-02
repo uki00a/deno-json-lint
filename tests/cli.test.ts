@@ -20,8 +20,9 @@ Deno.test({
 
       const actual = decoder.decode(stderr).trim();
       const expected = [
-        `${target}:2:11: [require-lockfile] A lockfile should be enabled`,
         `${target}: [require-minimum-dependency-age] \`minimumDependencyAge\` should be configured`,
+        `${target}:2:11: [require-lockfile] A lockfile should be enabled`,
+        `${target}:4:23: [ban-allow-all] --allow-all/-A should not be used`,
       ].join("\n");
       assert.equal(actual, expected);
 
