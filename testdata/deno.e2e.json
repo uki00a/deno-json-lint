@@ -1,0 +1,11 @@
+{
+  "lock": false,
+  "tasks": {
+    "with-allow-all": "deno run --allow-all src/cli.ts",
+    "without-allow-list": "deno run -R src/cli.ts"
+  },
+  "permissions": {
+    "with-allow-all": { "all": true },
+    "without-allow-list": "deno run -R src/cli.ts"
+  }
+}
