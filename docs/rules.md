@@ -15,9 +15,9 @@
 ## `require-lockfile`
 
 - **Description**: Enforces that a lockfile to be enabled.
-- **Tags**: recommended, security
+- **Tags**: recommended, security, dependencies
 
 ## `require-minimum-dependency-age`
 
 - **Description**: Enforces that `minimumDependencyAge` to be configured.
-- **Tags**: recommended, security
+- **Tags**: recommended, security, dependencies
