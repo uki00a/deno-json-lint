@@ -43,3 +43,6 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           NO_COLOR=1 deno task test:e2e 2>> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: deno publish --dry-run
+        run:
+          deno publish --dry-run
