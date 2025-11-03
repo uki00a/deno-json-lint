@@ -16,7 +16,7 @@ Deno.test({
     },
     "complex:ng": {
       "description": "This includes -A",
-      "command": "deno-run -A src/cli.ts"
+      "command": "deno-run -qA src/cli.ts"
     }
   }
 }`,
