@@ -1,4 +1,6 @@
 {
+  "name": "@uki00a/deno-json-lint",
+  "version": "0.0.0",
   "exclude": ["tmp"],
   "lint": {
     "rules": { "include": ["no-console"] },
@@ -52,5 +54,18 @@
     "lines-and-columns": "npm:lines-and-columns@^2.0.4",
     "string-argv": "npm:string-argv@^0.3.2"
   },
-  "minimumDependencyAge": 1440
+  "minimumDependencyAge": 1440,
+  "exports": {
+    ".": "./src/cli.ts"
+  },
+  "publish": {
+    "exclude": [
+      "./docs",
+      "./testdata",
+      "./tests",
+      "./tools",
+      ".github/",
+      "./.*"
+    ]
+  }
 }
