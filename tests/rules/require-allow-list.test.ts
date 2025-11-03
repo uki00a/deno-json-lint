@@ -85,7 +85,7 @@ Deno.test({
       () => {
         const given = `{
   "tasks": {
-    "ng": "deno run --allow-read -N --allow-run=deno --quiet src/cli.ts"
+    "ng": "deno run --allow-read -NS -E=DENO_DIR --allow-run=deno --quiet src/cli.ts"
   }
 }`;
         const actual = lintText(
@@ -96,7 +96,7 @@ Deno.test({
           {
             id: "require-allow-list",
             message:
-              "An allow list should be specified for --allow-read, --allow-net",
+              "An allow list should be specified for --allow-read, --allow-net, --allow-sys",
             line: 3,
             column: 11,
           },

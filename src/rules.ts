@@ -1,6 +1,7 @@
 import { parseArgsStringToArgv } from "string-argv";
 import type { JSONPath, Node } from "jsonc-parser";
 import { getNodePath, getNodeValue } from "jsonc-parser";
+import { findLaxPermissionFlags, isAllowAllFlag } from "./permissions.ts";
 import type {
   DenoConfigurationFileSchema,
   PermissionSet,
@@ -56,17 +57,16 @@ export const banAllowAll: LintRule = {
     if (node == null) {
       return null;
     }
-    const flagsToBan = ["--allow-all", "-A"];
     const path = getNodePath(node);
     if (path[0] === kTasks && node.type === "object") {
       walkTaskValueNodes(node, (taskValueNode) => {
         const command = getCommandFromTaskValueNode(taskValueNode);
         if (command == null) return;
         const args = parseArgsStringToArgv(command);
-        if (args.some((x) => flagsToBan.includes(x))) {
+        if (args.some(isAllowAllFlag)) {
           reporter.report({
             node: taskValueNode,
-            message: `${flagsToBan.join("/")} should not be used`,
+            message: "--allow-all/-A should not be used",
           });
         }
       });
@@ -132,41 +132,11 @@ export const requireAllowList: LintRule = {
     if (node == null) return;
     const path = getNodePath(node);
     if (path[0] === kTasks && node.type === "object") {
-      const shortAllowFlags = {
-        "read": "R",
-        "write": "W",
-        "import": "I",
-        "env": "E",
-        "net": "N",
-        "run": undefined,
-        "ffi": undefined,
-        "sys": "S",
-      } satisfies {
-        [Kind in Exclude<keyof PermissionSet, "all">]: string | undefined;
-      };
-      const permissionKinds = keys(shortAllowFlags);
-
       walkTaskValueNodes(node, (taskValueNode) => {
         const command = getCommandFromTaskValueNode(taskValueNode);
         if (command == null) return;
         const args = parseArgsStringToArgv(command);
-        const found = args.reduce(
-          (
-            found: Set<Exclude<keyof PermissionSet, "all">>,
-            arg: string,
-          ) => {
-            if (!arg.startsWith("-")) return found;
-            const kind = permissionKinds.find((kind) => {
-              const shortFlag = shortAllowFlags[kind];
-              const isAllowFlag = arg.startsWith(`--allow-${kind}`) ||
-                (shortFlag && arg.startsWith(`-${shortFlag}`));
-              return isAllowFlag && !arg.includes("=");
-            });
-            if (kind) found.add(kind);
-            return found;
-          },
-          new Set(),
-        );
+        const found = findLaxPermissionFlags(args);
         if (found.size > 0) {
           reporter.report({
             node: taskValueNode,
@@ -303,8 +273,4 @@ function getCommandFromTaskValueNode(taskValueNode: Node): string | undefined {
   return typeof task === "object"
     ? (task as TaskDefinition).command
     : task as string;
-}
-
-function keys<T extends Record<string, unknown>>(object: T): Array<keyof T> {
-  return Object.keys(object) as Array<keyof T>;
 }
