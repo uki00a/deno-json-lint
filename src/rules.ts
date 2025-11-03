@@ -7,6 +7,7 @@ import type {
 } from "../generated/config-file.v1.ts";
 
 type LintRuleTag =
+  | "dependencies"
   | "recommended"
   | "security"
   | "permissions";
@@ -224,7 +225,7 @@ export const requireAllowList: LintRule = {
  */
 export const requireLockfile: LintRule = {
   id: "require-lockfile",
-  tags: ["recommended", "security"],
+  tags: ["recommended", "security", "dependencies"],
   paths: () => [
     ["lock" satisfies keyof DenoConfigurationFileSchema],
   ],
@@ -243,7 +244,7 @@ export const requireLockfile: LintRule = {
  */
 export const requireMinimumDependencyAge: LintRule = {
   id: "require-minimum-dependency-age",
-  tags: ["recommended", "security"],
+  tags: ["recommended", "security", "dependencies"],
   paths: () => [
     ["minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema],
   ],
