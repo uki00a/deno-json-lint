@@ -13,6 +13,7 @@ Deno.test({
             ["read", "testdata"],
             ["net", "localhost"],
             ["run", "deno"],
+            ["scripts", "npm:duckdb"],
           ]
         ) {
           await t.step(`--allow-${kind}`, () => {
