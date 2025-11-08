@@ -4,6 +4,8 @@ function keys<T extends Record<string, unknown>>(object: T): Array<keyof T> {
   return Object.keys(object) as Array<keyof T>;
 }
 
+type PermissionKind = (keyof PermissionSet) | "scripts";
+
 const longNameByShortName = {
   "read": "R",
   "write": "W",
@@ -13,8 +15,9 @@ const longNameByShortName = {
   "run": undefined,
   "ffi": undefined,
   "sys": "S",
+  "scripts": undefined,
 } satisfies {
-  [Kind in Exclude<keyof PermissionSet, "all">]: string | undefined;
+  [Kind in Exclude<PermissionKind, "all">]: string | undefined;
 };
 const permissionKinds = keys(longNameByShortName);
 const shortNames = Object.values(longNameByShortName);
@@ -41,8 +44,8 @@ export function isAllowAllFlag(arg: string): boolean {
 
 export function findLaxPermissionFlags(
   args: Array<string>,
-): Set<Exclude<keyof PermissionSet, "all">> {
-  const found = new Set<Exclude<keyof PermissionSet, "all">>();
+): Set<Exclude<PermissionKind, "all">> {
+  const found = new Set<Exclude<PermissionKind, "all">>();
   for (const arg of args) {
     if (!arg.startsWith("-")) continue;
     if (arg.startsWith("--")) {
