@@ -1,7 +1,9 @@
 import { join, relative } from "node:path";
 import { parseArgs } from "node:util";
-import { bold, red } from "@std/fmt/colors";
+import { bold, red, yellow } from "@std/fmt/colors";
 import { lintText } from "./lint.ts";
+import type { Config as DenoJsonLintConfig } from "./config.ts";
+import { kConfigKey } from "./config.ts";
 
 interface Logger {
   info(message: unknown): void;
@@ -49,6 +51,7 @@ async function main({
     return 1;
   }
 
+  const configs: Array<{ path: string; content: string }> = [];
   for (const path of allowedPaths) {
     let configAsText: string | undefined = undefined;
     try {
@@ -61,31 +64,76 @@ async function main({
       return 1;
     }
     if (configAsText === undefined) continue;
+    configs.push({ path, content: configAsText });
+  }
 
-    const diagnostics = await lintText(configAsText);
-    if (diagnostics.length === 0) return 0;
+  if (configs.length === 0) {
+    logger.error(
+      bold(red(
+        `${target ? target : "deno.json(c)"} is not found`,
+      )),
+    );
+    return 1;
+  }
+
+  let config: DenoJsonLintConfig = { rules: {} };
+  let foundConfigAt: string | null = null;
+  for (const { content, path } of configs) {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed == null) continue;
+      if (parsed[kConfigKey] == null) continue;
+      if (foundConfigAt) {
+        logger.warn(
+          yellow(
+            `Ignored \"${kConfigKey}\" key in '${path}' since \"${kConfigKey}"\ was also found in '${foundConfigAt}'`,
+          ),
+        );
+        continue;
+      }
+      foundConfigAt = path;
+      // TODO: Validate `config`
+      config = parsed[kConfigKey];
+    } catch (err) {
+      if (!(err instanceof SyntaxError)) {
+        logger.error(bold(red(`Detected an unexpected error: ${err}`)));
+        return 1;
+      }
+      continue;
+    }
+  }
+
+  let exitCode: ExitCode = 0;
+  for (const { path, content } of configs) {
+    const diagnostics = await lintText(content, { config });
+    if (diagnostics.length === 0) continue;
 
     const relativePath = relative(cwd, path);
     for (const diagnostic of diagnostics) {
       const line = diagnostic.line == null ? "" : `:${diagnostic.line}`;
       const column = diagnostic.column == null ? "" : `:${diagnostic.column}`;
-      logger.error(
-        bold(
-          red(
-            `${relativePath}${line}${column}: [${diagnostic.id}] ${diagnostic.message}`,
+      const severity = config?.rules?.[diagnostic.id] === "warn"
+        ? "warn"
+        : "error";
+      const message =
+        `${relativePath}${line}${column}: [${diagnostic.id}] ${diagnostic.message}`;
+      if (severity === "error") {
+        exitCode = 1;
+        logger[severity](
+          bold(
+            red(
+              message,
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        logger[severity](
+          yellow(message),
+        );
+      }
     }
-    return 1;
   }
-
-  logger.error(
-    bold(red(
-      `${target ? target : "deno.json(c)"} is not found`,
-    )),
-  );
-  return 1;
+  return exitCode;
 }
 
 if (import.meta.main) {

@@ -76,5 +76,28 @@ Deno.test({
         assert.equal(actual, expected);
       },
     );
+
+    await t.step(
+      "supports customizing the behavior",
+      async () => {
+        const target = "testdata/deno.with-config.json";
+        const { code, stdout, stderr } = await new Deno.Command("deno", {
+          args: [
+            "run",
+            `--allow-read=${target}`,
+            "src/cli.ts",
+            target,
+          ],
+          env: { NO_COLOR: "1" },
+        }).output();
+        assert.equal(code, 0);
+        assert.equal(decoder.decode(stdout).trim(), "");
+
+        const actual = decoder.decode(stderr).trim();
+        const expected =
+          `${target}: [require-minimum-dependency-age] \`minimumDependencyAge\` should be configured`;
+        assert.equal(actual, expected);
+      },
+    );
   },
 });
