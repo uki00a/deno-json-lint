@@ -1,6 +1,7 @@
 import type { JSONPath } from "jsonc-parser";
 import { findNodeAtLocation, parseTree } from "jsonc-parser";
 import { LinesAndColumns } from "lines-and-columns";
+import type { Config as DenoJsonLintConfig } from "./config.ts";
 import type { LintReporter, LintRule } from "./rules.ts";
 import {
   banAllowAll,
@@ -18,6 +19,7 @@ export interface Diagnostic {
 
 export interface LintOptions {
   include?: Array<string>;
+  config?: DenoJsonLintConfig;
 }
 
 export function lintText(
@@ -100,9 +102,23 @@ function determineRules(
   if (options == null) {
     return rules;
   }
-  if (options.include == null || options.include.length === 0) {
+  const predicates: Array<(rule: LintRule) => boolean> = [];
+  if (options.include != null && options.include.length > 0) {
+    const { include: ruleIds } = options;
+    predicates.push((x) => ruleIds.includes(x.id));
+  }
+
+  if (options.config?.rules) {
+    const disabledRules = Object.entries(options?.config?.rules)
+      .filter(([, severity]) => severity === "off")
+      .map(([id]) => id);
+    if (disabledRules.length > 0) {
+      predicates.push((x) => !disabledRules.includes(x.id));
+    }
+  }
+
+  if (predicates.length === 0) {
     return rules;
   }
-  const { include: ruleIds } = options;
-  return rules.filter((x) => ruleIds.includes(x.id));
+  return rules.filter((x) => predicates.every((p) => p(x)));
 }
