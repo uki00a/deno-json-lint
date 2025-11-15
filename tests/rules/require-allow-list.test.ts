@@ -176,5 +176,89 @@ Deno.test({
         assert.deepEqual(actual, expected);
       },
     );
+
+    await t.step(
+      "reports the unsafe use of `allowScripts` field",
+      async (t) => {
+        for (const value of [true, []]) {
+          const serialized = JSON.stringify(value);
+          await t.step(`allowScripts: ${serialized}`, () => {
+            const actual = lintText(
+              `{
+  "allowScripts": ${serialized}
+}`,
+              { include: ["require-allow-list"] },
+            );
+            const expected = [
+              {
+                id: "require-allow-list",
+                message:
+                  "A list of npm packages allowed to run lifecycle scripts should be specified",
+                line: 2,
+                column: 19,
+              },
+            ];
+            assert.deepEqual(actual, expected);
+          });
+        }
+      },
+    );
+
+    await t.step(
+      "reports the unsafe use of `allowScripts.allow`",
+      async (t) => {
+        for (const value of [true, []]) {
+          const serialized = JSON.stringify(value);
+          await t.step(`allowScripts.allow: ${serialized}`, () => {
+            const actual = lintText(
+              `{
+  "allowScripts": {
+    "allow": ${serialized}
+  }
+}`,
+              { include: ["require-allow-list"] },
+            );
+            const expected = [
+              {
+                id: "require-allow-list",
+                message:
+                  "A list of npm packages allowed to run lifecycle scripts should be specified",
+                line: 3,
+                column: 14,
+              },
+            ];
+            assert.deepEqual(actual, expected);
+          });
+        }
+      },
+    );
+
+    await t.step(
+      "allows `allowScripts` with an allow list",
+      () => {
+        const actual = lintText(
+          `{
+  "allowScripts": ["npm:better-sqlite3"]
+}`,
+          { include: ["require-allow-list"] },
+        );
+        assert.deepEqual(actual, []);
+      },
+    );
+
+    await t.step(
+      "allows `allowScripts.allow` with an allow list",
+      () => {
+        const actual = lintText(
+          `{
+  "allowScripts": {
+    "allow": ["npm:better-sqlite3"]
+  }
+}`,
+          { include: ["require-allow-list"] },
+        );
+        assert.deepEqual(actual, []);
+      },
+    );
   },
 });
