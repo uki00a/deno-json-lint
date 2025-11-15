@@ -3,6 +3,7 @@ import type { JSONPath, Node } from "jsonc-parser";
 import { getNodePath, getNodeValue } from "jsonc-parser";
 import { findLaxPermissionFlags, isAllowAllFlag } from "./permissions.ts";
 import type {
+  AllowScriptsList,
   DenoConfigurationFileSchema,
   PermissionSet,
 } from "../generated/config-file.v1.ts";
@@ -39,6 +40,12 @@ const kPermissions = "permissions" satisfies keyof DenoConfigurationFileSchema;
 const kCompile = "compile" satisfies keyof DenoConfigurationFileSchema;
 const kTest = "test" satisfies keyof DenoConfigurationFileSchema;
 const kBench = "bench" satisfies keyof DenoConfigurationFileSchema;
+const kAllowScripts =
+  "allowScripts" satisfies keyof DenoConfigurationFileSchema;
+const kAllow = "allow" satisfies keyof Exclude<
+  NonNullable<DenoConfigurationFileSchema["allowScripts"]>,
+  boolean | AllowScriptsList
+>;
 
 /**
  * Disallows the use of `--allow-all`.
@@ -127,6 +134,8 @@ export const requireAllowList: LintRule = {
     [kBench, kPermissions],
     [kCompile, kPermissions],
     [kTest, kPermissions],
+    [kAllowScripts],
+    [kAllowScripts, kAllow],
   ],
   lint(reporter, node) {
     if (node == null) return;
@@ -156,6 +165,8 @@ export const requireAllowList: LintRule = {
       node.type === "object"
     ) {
       lintPermissionSet(node);
+    } else if (path[0] === kAllowScripts) {
+      lintAllowScriptsConfig(node);
     }
 
     function lintPermissionSet(permissionSetNode: Node): void {
@@ -185,6 +196,23 @@ export const requireAllowList: LintRule = {
             message: `An allow list should be specified`,
           });
         }
+      }
+    }
+
+    function lintAllowScriptsConfig(node: Node): void {
+      const message =
+        "A list of npm packages allowed to run lifecycle scripts should be specified";
+      const value = getNodeValue(node);
+      if (value === true) {
+        reporter.report({
+          message,
+          node,
+        });
+      } else if (Array.isArray(value) && value.length === 0) {
+        reporter.report({
+          message,
+          node,
+        });
       }
     }
   },
