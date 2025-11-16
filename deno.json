@@ -1,6 +1,6 @@
 {
   "name": "@uki00a/deno-json-lint",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "exclude": ["tmp"],
   "lint": {
     "rules": { "include": ["no-console"] },
