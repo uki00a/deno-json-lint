@@ -19,6 +19,7 @@ export interface Diagnostic {
 
 export interface LintOptions {
   include?: Array<string>;
+  exclude?: Array<string>;
   config?: DenoJsonLintConfig;
 }
 
@@ -106,6 +107,11 @@ function determineRules(
   if (options.include != null && options.include.length > 0) {
     const { include: ruleIds } = options;
     predicates.push((x) => ruleIds.includes(x.id));
+  }
+
+  if (options.exclude != null && options.exclude.length > 0) {
+    const { exclude: ruleIds } = options;
+    predicates.push((x) => !ruleIds.includes(x.id));
   }
 
   if (options.config?.rules) {
