@@ -1,0 +1,22 @@
+{
+  "workspace": {
+    "members": [
+      "./workspace/deno.1.json",
+      "./workspace/deno.2.json"
+    ]
+  },
+  "tasks": {
+    "with-all": "deno run --allow-all main.mjs"
+  },
+  "permissions": {
+    "default": {
+      "read": true
+    }
+  },
+  "minimumDependencyAge": 1440,
+  "deno-json-lint": {
+    "rules": {
+      "ban-allow-all": "off"
+    }
+  }
+}
