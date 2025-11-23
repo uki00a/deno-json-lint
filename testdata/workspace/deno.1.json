@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "ng": "deno run --allow-all main.mjs"
+  },
+  "deno-json-lint": {
+    "rules": {
+      "ban-allow-all": "error"
+    }
+  }
+}

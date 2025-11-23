@@ -1,9 +1,12 @@
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import { bold, red, yellow } from "@std/fmt/colors";
 import { lintText } from "./lint.ts";
 import type { Config as DenoJsonLintConfig } from "./config.ts";
 import { kConfigKey } from "./config.ts";
+import type {
+  DenoConfigurationFileSchema,
+} from "../generated/config-file.v1.ts";
 
 interface Logger {
   info(message: unknown): void;
@@ -19,6 +22,13 @@ interface Options {
 
 const kDenoJSON = "deno.json";
 const kDenoJSONC = "deno.jsonc";
+
+type WorkspaceConfig = Exclude<
+  NonNullable<DenoConfigurationFileSchema["workspace"]>,
+  string[]
+>;
+const kWorkspace = "workspace" satisfies keyof DenoConfigurationFileSchema;
+const kMembers = "members" satisfies keyof WorkspaceConfig;
 type ExitCode = 1 | 0;
 async function main({
   cwd = Deno.cwd(),
@@ -51,7 +61,11 @@ async function main({
     return 1;
   }
 
-  const configs: Array<{ path: string; content: string }> = [];
+  const configs: Array<{
+    path: string;
+    content: string;
+    isRoot: boolean;
+  }> = [];
   for (const path of allowedPaths) {
     let configAsText: string | undefined = undefined;
     try {
@@ -64,7 +78,7 @@ async function main({
       return 1;
     }
     if (configAsText === undefined) continue;
-    configs.push({ path, content: configAsText });
+    configs.push({ path, content: configAsText, isRoot: true });
   }
 
   if (configs.length === 0) {
@@ -77,6 +91,10 @@ async function main({
   }
 
   let config: DenoJsonLintConfig = { rules: {} };
+  let workspaces: Array<{
+    rootPath: string;
+    members: NonNullable<WorkspaceConfig["members"]>;
+  }> = [];
   let foundConfigAt: string | null = null;
   for (const { content, path } of configs) {
     try {
@@ -94,12 +112,59 @@ async function main({
       foundConfigAt = path;
       // TODO: Validate `config`
       config = parsed[kConfigKey];
+
+      // Read workspace members
+      const maybeWorkspace = parsed[kWorkspace];
+      let members: NonNullable<WorkspaceConfig["members"]> | null = null;
+      if (Array.isArray(maybeWorkspace)) {
+        members = maybeWorkspace;
+      } else if (maybeWorkspace && maybeWorkspace[kMembers]) {
+        members = maybeWorkspace[kMembers];
+      }
+
+      if (members) {
+        workspaces.push({ rootPath: path, members });
+      }
     } catch (err) {
       if (!(err instanceof SyntaxError)) {
         logger.error(bold(red(`Detected an unexpected error: ${err}`)));
         return 1;
       }
       continue;
+    }
+  }
+
+  for (let i = 0; i < workspaces.length; i++) {
+    const workspace = workspaces[i];
+    for (let j = 0; j < workspace.members.length; j++) {
+      const path = join(dirname(workspace.rootPath), workspace.members[j]);
+      const status = await Deno.permissions.query({
+        name: "read",
+        path,
+      });
+      if (status.state === "granted") {
+        let configAsText: string | undefined = undefined;
+        try {
+          configAsText = await Deno.readTextFile(path);
+        } catch (error) {
+          if (error instanceof Deno.errors.NotFound) {
+            continue;
+          }
+          logger.error(error);
+          return 1;
+        }
+        if (configAsText === undefined) continue;
+        configs.push({ path, content: configAsText, isRoot: false });
+      } else {
+        logger.error(
+          bold(
+            red(
+              `Requires read access to ${path}`,
+            ),
+          ),
+        );
+        return 1;
+      }
     }
   }
 

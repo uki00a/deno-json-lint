@@ -99,5 +99,28 @@ Deno.test({
         assert.equal(actual, expected);
       },
     );
+
+    await t.step(
+      "supports workspaces",
+      async () => {
+        const target = "testdata/deno.ws-root.json";
+        const { code, stdout, stderr } = await new Deno.Command("deno", {
+          args: [
+            "run",
+            `--allow-read=${target},testdata/workspace`,
+            "src/cli.ts",
+            target,
+          ],
+          env: { NO_COLOR: "1" },
+        }).output();
+        assert.equal(code, 1);
+        assert.equal(decoder.decode(stdout).trim(), "");
+
+        const actual = decoder.decode(stderr).trim();
+        const expected =
+          `${target}:13:15: [require-allow-list] An allow list should be specified`;
+        assert.equal(actual, expected);
+      },
+    );
   },
 });
