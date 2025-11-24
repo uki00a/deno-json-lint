@@ -1,9 +1,13 @@
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import { bold, red, yellow } from "@std/fmt/colors";
 import { lintText } from "./lint.ts";
 import type { Config as DenoJsonLintConfig } from "./config.ts";
-import { kConfigKey } from "./config.ts";
+import { kConfigKey, mergeConfigs } from "./config.ts";
+import { kRootOnlyRules } from "./rules.ts";
+import type {
+  DenoConfigurationFileSchema,
+} from "../generated/config-file.v1.ts";
 
 interface Logger {
   info(message: unknown): void;
@@ -19,6 +23,26 @@ interface Options {
 
 const kDenoJSON = "deno.json";
 const kDenoJSONC = "deno.jsonc";
+
+type WorkspaceConfig = Exclude<
+  NonNullable<DenoConfigurationFileSchema["workspace"]>,
+  string[]
+>;
+const kWorkspace = "workspace" satisfies keyof DenoConfigurationFileSchema;
+const kMembers = "members" satisfies keyof WorkspaceConfig;
+
+interface FoundDenoJSON {
+  path: string;
+  content: string;
+  config?: DenoJsonLintConfig;
+  parent?: FoundDenoJSON;
+}
+
+interface FoundWorkspace {
+  parentDenoJSON: FoundDenoJSON;
+  members: NonNullable<WorkspaceConfig["members"]>;
+}
+
 type ExitCode = 1 | 0;
 async function main({
   cwd = Deno.cwd(),
@@ -51,7 +75,8 @@ async function main({
     return 1;
   }
 
-  const configs: Array<{ path: string; content: string }> = [];
+  const denoJSONs: Array<FoundDenoJSON> = [];
+  const workspaces: Array<FoundWorkspace> = [];
   for (const path of allowedPaths) {
     let configAsText: string | undefined = undefined;
     try {
@@ -64,10 +89,49 @@ async function main({
       return 1;
     }
     if (configAsText === undefined) continue;
-    configs.push({ path, content: configAsText });
+
+    let parsed: ReturnType<typeof JSON.parse> | undefined = undefined;
+    try {
+      parsed = JSON.parse(configAsText);
+    } catch (err) {
+      if (!(err instanceof SyntaxError)) {
+        logger.error(bold(red(`Detected an unexpected error: ${err}`)));
+        return 1;
+      }
+      continue;
+    }
+    let config: DenoJsonLintConfig | undefined = undefined;
+    if (parsed && parsed[kConfigKey]) {
+      // TODO: Validate config
+      config = parsed[kConfigKey];
+    }
+    const foundDenoJSON: FoundDenoJSON = {
+      path,
+      content: configAsText,
+      config,
+    };
+    denoJSONs.push(foundDenoJSON);
+    if (config == null) continue;
+    if (parsed == null) continue;
+
+    // Read workspace members
+    const maybeWorkspace = parsed[kWorkspace];
+    let members: NonNullable<WorkspaceConfig["members"]> | null = null;
+    if (Array.isArray(maybeWorkspace)) {
+      members = maybeWorkspace;
+    } else if (maybeWorkspace && maybeWorkspace[kMembers]) {
+      members = maybeWorkspace[kMembers];
+    }
+
+    if (members) {
+      workspaces.push({
+        parentDenoJSON: foundDenoJSON,
+        members,
+      });
+    }
   }
 
-  if (configs.length === 0) {
+  if (denoJSONs.length === 0) {
     logger.error(
       bold(red(
         `${target ? target : "deno.json(c)"} is not found`,
@@ -76,36 +140,77 @@ async function main({
     return 1;
   }
 
-  let config: DenoJsonLintConfig = { rules: {} };
-  let foundConfigAt: string | null = null;
-  for (const { content, path } of configs) {
-    try {
-      const parsed = JSON.parse(content);
-      if (parsed == null) continue;
-      if (parsed[kConfigKey] == null) continue;
-      if (foundConfigAt) {
-        logger.warn(
-          yellow(
-            `Ignored \"${kConfigKey}\" key in '${path}' since \"${kConfigKey}"\ was also found in '${foundConfigAt}'`,
+  for (let i = 0; i < workspaces.length; i++) {
+    const workspace = workspaces[i];
+    for (let j = 0; j < workspace.members.length; j++) {
+      const path = join(
+        dirname(workspace.parentDenoJSON.path),
+        workspace.members[j],
+      );
+      const status = await Deno.permissions.query({
+        name: "read",
+        path,
+      });
+      if (status.state === "granted") {
+        let configAsText: string | undefined = undefined;
+        try {
+          configAsText = await Deno.readTextFile(path);
+        } catch (error) {
+          if (error instanceof Deno.errors.NotFound) {
+            continue;
+          }
+          logger.error(error);
+          return 1;
+        }
+        if (configAsText === undefined) continue;
+        let parsed: ReturnType<typeof JSON.parse> | undefined = undefined;
+        try {
+          parsed = JSON.parse(configAsText);
+        } catch (err) {
+          if (!(err instanceof SyntaxError)) {
+            logger.error(bold(red(`Detected an unexpected error: ${err}`)));
+            return 1;
+          }
+          continue;
+        }
+        let config: DenoJsonLintConfig | undefined = undefined;
+        if (parsed && parsed[kConfigKey]) {
+          // TODO: Validate config
+          config = parsed[kConfigKey];
+        }
+        denoJSONs.push({
+          path,
+          content: configAsText,
+          config,
+          parent: workspace.parentDenoJSON,
+        });
+      } else {
+        logger.error(
+          bold(
+            red(
+              `Requires read access to ${path}`,
+            ),
           ),
         );
-        continue;
-      }
-      foundConfigAt = path;
-      // TODO: Validate `config`
-      config = parsed[kConfigKey];
-    } catch (err) {
-      if (!(err instanceof SyntaxError)) {
-        logger.error(bold(red(`Detected an unexpected error: ${err}`)));
         return 1;
       }
-      continue;
     }
   }
 
   let exitCode: ExitCode = 0;
-  for (const { path, content } of configs) {
-    const diagnostics = await lintText(content, { config });
+  for (const { path, content, config, parent } of denoJSONs) {
+    const isRoot = parent == null;
+    const diagnostics = await lintText(
+      content,
+      {
+        config: parent == null
+          ? config
+          : (parent.config && config
+            ? mergeConfigs(parent.config, config)
+            : config),
+        exclude: isRoot ? undefined : kRootOnlyRules,
+      },
+    );
     if (diagnostics.length === 0) continue;
 
     const relativePath = relative(cwd, path);

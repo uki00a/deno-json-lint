@@ -47,6 +47,12 @@ const kAllow = "allow" satisfies keyof Exclude<
   boolean | AllowScriptsList
 >;
 
+const kRequireLockfile = "require-lockfile";
+const kRequireMinimumDependencyAge = "require-minimum-dependency-age";
+export const kRootOnlyRules = [
+  kRequireLockfile,
+  kRequireMinimumDependencyAge,
+];
 /**
  * Disallows the use of `--allow-all`.
  */
@@ -222,7 +228,7 @@ export const requireAllowList: LintRule = {
  * Enforces that a lockfile to be enabled.
  */
 export const requireLockfile: LintRule = {
-  id: "require-lockfile",
+  id: kRequireLockfile,
   tags: ["recommended", "security", "dependencies"],
   paths: () => [
     ["lock" satisfies keyof DenoConfigurationFileSchema],
@@ -241,7 +247,7 @@ export const requireLockfile: LintRule = {
  * Enforces that `minimumDependencyAge` to be configured.
  */
 export const requireMinimumDependencyAge: LintRule = {
-  id: "require-minimum-dependency-age",
+  id: kRequireMinimumDependencyAge,
   tags: ["recommended", "security", "dependencies"],
   paths: () => [
     ["minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema],
