@@ -232,9 +232,25 @@ export const requireLockfile: LintRule = {
   tags: ["recommended", "security", "dependencies"],
   paths: () => [
     ["lock" satisfies keyof DenoConfigurationFileSchema],
+    [kTasks],
   ],
   lint(reporter, node) {
-    if (node != null && getNodeValue(node) === false) {
+    const path = node ? getNodePath(node) : [];
+    if (node && path[0] === kTasks) {
+      if (node.type !== "object") return;
+      walkTaskValueNodes(node, (taskValueNode) => {
+        const command = getCommandFromTaskValueNode(taskValueNode);
+        if (command == null) return;
+        const args = parseArgsStringToArgv(command);
+        const kNoLockFlag = "--no-lock";
+        if (args.includes(kNoLockFlag)) {
+          reporter.report({
+            node: taskValueNode,
+            message: `${kNoLockFlag} should not be used`,
+          });
+        }
+      });
+    } else if (node != null && getNodeValue(node) === false) {
       reporter.report({
         message: "A lockfile should be enabled",
         node,
