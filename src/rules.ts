@@ -1,6 +1,6 @@
 import { parseArgsStringToArgv } from "string-argv";
 import type { JSONPath, Node } from "jsonc-parser";
-import { getNodePath, getNodeValue } from "jsonc-parser";
+import { findNodeAtLocation, getNodePath, getNodeValue } from "jsonc-parser";
 import { findLaxPermissionFlags, isAllowAllFlag } from "./permissions.ts";
 import type {
   AllowScriptsList,
@@ -19,15 +19,17 @@ interface LintReport {
   node?: Node;
 }
 
-export interface LintReporter {
+export interface LintContext<T = unknown> {
   report(data: LintReport): void;
+  readonly options: T;
 }
 
-export interface LintRule {
+export interface LintRule<T = unknown> {
   id: string;
   tags: Array<LintRuleTag>;
-  lint(reporter: LintReporter, node: Node | undefined): void;
+  lint(reporter: LintContext<T>, node: Node | undefined): void;
   paths(): Array<JSONPath>;
+  defaultOptions?: T;
 }
 
 const kTasks = "tasks" satisfies keyof DenoConfigurationFileSchema;
@@ -49,10 +51,14 @@ const kAllow = "allow" satisfies keyof Exclude<
 
 const kRequireLockfile = "require-lockfile";
 const kRequireMinimumDependencyAge = "require-minimum-dependency-age";
+const kNoRestrictedFields = "no-restricted-fields";
 export const kRootOnlyRules = [
   kRequireLockfile,
   kRequireMinimumDependencyAge,
 ];
+
+export const kRootPath: JSONPath = [];
+
 /**
  * Disallows the use of `--allow-all`.
  */
@@ -124,6 +130,35 @@ export const banAllowAll: LintRule = {
           });
         }
       }
+    }
+  },
+};
+
+interface NoRestrictedFieldsOptions {
+  /**
+   * An object whose keys are fields not permitted for use in `deno.json`, and whose values are messages.
+   */
+  fields?: Record<string, string>;
+}
+/**
+ * Disallows certain fields in `deno.json`.
+ */
+export const noRestrictedFields: LintRule<NoRestrictedFieldsOptions> = {
+  id: kNoRestrictedFields,
+  tags: [],
+  paths: () => [kRootPath],
+  defaultOptions: {},
+  lint(reporter, node) {
+    if (node == null) return;
+    const fields = reporter.options.fields ?? {};
+    for (const [field, message] of Object.entries(fields)) {
+      // TODO: Support nested fields
+      const found = findNodeAtLocation(node, [field]);
+      if (found == null) continue;
+      reporter.report({
+        message,
+        node: found.parent,
+      });
     }
   },
 };

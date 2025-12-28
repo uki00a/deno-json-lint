@@ -7,6 +7,11 @@
 - **Description**: Disallows the use of `--allow-all`.
 - **Tags**: recommended, security, permissions
 
+## `no-restricted-fields`
+
+- **Description**: Disallows certain fields in `deno.json`.
+- **Tags**:
+
 ## `require-allow-list`
 
 - **Description**: Enforces that `--allow-*` flag to have an allow list.

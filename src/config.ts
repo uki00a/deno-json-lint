@@ -8,7 +8,7 @@ export type Severity =
   | "off"
   | "warn"
   | "error";
-type RuleConfig = Severity;
+type RuleConfig = Severity | [Severity, unknown];
 
 export const kConfigKey = "deno-json-lint";
 
