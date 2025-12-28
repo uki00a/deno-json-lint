@@ -2,9 +2,11 @@ import type { JSONPath } from "jsonc-parser";
 import { findNodeAtLocation, parseTree } from "jsonc-parser";
 import { LinesAndColumns } from "lines-and-columns";
 import type { Config as DenoJsonLintConfig } from "./config.ts";
-import type { LintReporter, LintRule } from "./rules.ts";
+import type { LintContext, LintRule } from "./rules.ts";
 import {
   banAllowAll,
+  kRootPath,
+  noRestrictedFields,
   requireAllowList,
   requireLockfile,
   requireMinimumDependencyAge,
@@ -32,6 +34,7 @@ export function lintText(
   const lines = new LinesAndColumns(configAsText);
   const rules = determineRules([
     banAllowAll,
+    noRestrictedFields,
     requireAllowList,
     requireLockfile,
     requireMinimumDependencyAge,
@@ -40,6 +43,7 @@ export function lintText(
     rules: Array<LintRule>;
     path: JSONPath;
   }> = {};
+  const rootKey = JSON.stringify(kRootPath);
   for (const rule of rules) {
     for (const path of rule.paths()) {
       const key = JSON.stringify(path);
@@ -48,10 +52,15 @@ export function lintText(
     }
   }
   const diagnostics: Array<Diagnostic> = [];
-  for (const { rules, path } of Object.values(rulesGroupedByPath)) {
-    const node = findNodeAtLocation(tree, path);
+  for (const [key, { rules, path }] of Object.entries(rulesGroupedByPath)) {
+    const node = key === rootKey ? tree : findNodeAtLocation(tree, path);
     for (const rule of rules) {
-      const reporter: LintReporter = {
+      const maybeRuleConfig = options?.config?.rules?.[rule.id];
+      const maybeRuleOptions = Array.isArray(maybeRuleConfig)
+        ? maybeRuleConfig[1]
+        : rule.defaultOptions;
+      const context: LintContext = {
+        options: maybeRuleOptions ?? rule.defaultOptions,
         report(data) {
           const { node, ...problem } = data;
           const maybeLocation = node && lines.locationForIndex(node.offset);
@@ -67,7 +76,7 @@ export function lintText(
           });
         },
       };
-      rule.lint(reporter, node);
+      rule.lint(context, node);
     }
   }
   diagnostics.sort((a, b) => {
@@ -116,7 +125,10 @@ function determineRules(
 
   if (options.config?.rules) {
     const disabledRules = Object.entries(options?.config?.rules)
-      .filter(([, severity]) => severity === "off")
+      .filter(([, config]) => {
+        const severity = Array.isArray(config) ? config[0] : config;
+        return severity === "off";
+      })
       .map(([id]) => id);
     if (disabledRules.length > 0) {
       predicates.push((x) => !disabledRules.includes(x.id));
