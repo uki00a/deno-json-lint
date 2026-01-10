@@ -2,10 +2,16 @@
 
 A linter for `deno.json`.
 
+## Installation
+
+```shell
+$ deno add jsr:@uki00a/deno-json-lint
+```
+
 ## Usage
 
 ```shell
-$ deno run --allow-read=deno.json jsr:@uki00a/deno-json-lint
+$ deno run --allow-read=deno.json @uki00a/deno-json-lint
 ```
 
 ## Rules
