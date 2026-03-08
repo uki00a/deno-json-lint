@@ -36,5 +36,45 @@ Deno.test({
       ];
       assert.deepEqual(actual, expected);
     });
+
+    await t.step("support nested properties", () => {
+      const actual = lintText(
+        `{
+  "imports": {
+    "@std/fmt": "jsr:@std/fmt@^1.0.8"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["./foo.js"]
+    }
+  }
+}`,
+        {
+          include: ["no-restricted-fields"],
+          config: {
+            rules: {
+              "no-restricted-fields": ["error", {
+                fields: {
+                  lint: {
+                    rules: {
+                      exclude: "Use of lint.rules.exclude is not allowed",
+                    },
+                  },
+                },
+              }],
+            },
+          },
+        },
+      );
+      const expected = [
+        {
+          id: "no-restricted-fields",
+          message: "Use of lint.rules.exclude is not allowed",
+          line: 7,
+          column: 7,
+        },
+      ];
+      assert.deepEqual(actual, expected);
+    });
   },
 });

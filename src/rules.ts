@@ -134,12 +134,15 @@ export const banAllowAll: LintRule = {
   },
 };
 
+interface RestrictedFields extends Record<string, string | RestrictedFields> {}
+
 interface NoRestrictedFieldsOptions {
   /**
    * An object whose keys are fields not permitted for use in `deno.json`, and whose values are messages.
    */
-  fields?: Record<string, string>;
+  fields?: RestrictedFields;
 }
+
 /**
  * Disallows certain fields in `deno.json`.
  */
@@ -151,15 +154,25 @@ export const noRestrictedFields: LintRule<NoRestrictedFieldsOptions> = {
   lint(reporter, node) {
     if (node == null) return;
     const fields = reporter.options.fields ?? {};
-    for (const [field, message] of Object.entries(fields)) {
-      // TODO: Support nested fields
-      const found = findNodeAtLocation(node, [field]);
-      if (found == null) continue;
-      reporter.report({
-        message,
-        node: found.parent,
-      });
-    }
+    const lintFields = (
+      fields: RestrictedFields,
+      seenFields: Array<string> = [],
+    ): void => {
+      for (const [field, fieldsOrMessage] of Object.entries(fields)) {
+        if (typeof fieldsOrMessage === "string") {
+          const message = fieldsOrMessage;
+          const found = findNodeAtLocation(node, [...seenFields, field]);
+          if (found == null) continue;
+          reporter.report({
+            message,
+            node: found.parent,
+          });
+        } else {
+          lintFields(fieldsOrMessage, [...seenFields, field]);
+        }
+      }
+    };
+    lintFields(fields);
   },
 };
 
