@@ -26,7 +26,8 @@
     },
     "tools:generate-rules-md": {
       "run": ["deno"],
-      "write": ["docs/rules.md"]
+      "write": ["docs/rules.md"],
+      "env": { ignore: true }
     }
   },
   "tasks": {
