@@ -45,7 +45,9 @@
     "permissions": {
       "run": ["deno"],
       "read": ["testdata"]
-    }
+    },
+    "sanitizeOps": true,
+    "sanitizeResources": true
   },
   "imports": {
     "@std/collections": "jsr:@std/collections@^1.1.3",
