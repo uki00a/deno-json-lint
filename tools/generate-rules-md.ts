@@ -13,17 +13,22 @@ async function main() {
   if (code !== 0) {
     throw new Error(decoder.decode(stderr));
   }
-  const { nodes } = JSON.parse(decoder.decode(stdout));
+  const { nodes }: {
+    // deno-lint-ignore no-explicit-any -- This is not production code
+    nodes: Record<string, any>;
+  } = JSON.parse(decoder.decode(stdout));
   const sections = [];
-  for (const node of nodes) {
-    if (node.declarationKind !== "export") continue;
-    if (node.kind !== "variable") continue;
-    if (node.variableDef.tsType.repr !== "LintRule") continue;
+  for (const sym of Object.values(nodes)[0].symbols) {
+    if (sym.declarations == null) continue;
+    const [decl] = sym.declarations;
+    if (decl.declarationKind !== "export") continue;
+    if (decl.kind !== "variable") continue;
+    if (decl.def.tsType.repr !== "LintRule") continue;
     // @ts-expect-error - TODO: type `nodes`
-    const rule = rules[node.name] as LintRule;
+    const rule = rules[sym.name] as LintRule;
     sections.push(`## \`${rule.id}\`
 
-- **Description**: ${node.jsDoc?.doc ?? ""}
+- **Description**: ${decl.jsDoc?.doc ?? ""}
 - **Tags**: ${rule.tags.join(", ")}`);
   }
 

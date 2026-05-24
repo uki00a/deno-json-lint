@@ -26,7 +26,8 @@
     },
     "tools:generate-rules-md": {
       "run": ["deno"],
-      "write": ["docs/rules.md"]
+      "write": ["docs/rules.md"],
+      "env": { "ignore": true }
     }
   },
   "tasks": {
@@ -45,7 +46,9 @@
     "permissions": {
       "run": ["deno"],
       "read": ["testdata"]
-    }
+    },
+    "sanitizeOps": true,
+    "sanitizeResources": true
   },
   "imports": {
     "@std/collections": "jsr:@std/collections@^1.1.3",
