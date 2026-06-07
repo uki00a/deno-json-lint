@@ -16,7 +16,8 @@
   "minimumDependencyAge": 1440,
   "deno-json-lint": {
     "rules": {
-      "ban-allow-all": "off"
+      "ban-allow-all": "off",
+      "require-test-sanitizers": "off"
     }
   }
 }

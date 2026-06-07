@@ -3,8 +3,8 @@ import { basename, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileFromFile, DEFAULT_OPTIONS } from "json-schema-to-typescript";
 
-/** v3.0.0-rc.0 */
-const kDenoVersion = "138b2e0e62d07a8786385cae46ac179afbf9973f";
+/** v2.8.2 */
+const kDenoVersion = "085be0b5ff8ca3ccfe58318afe0939c4d4af9743";
 const kBaseURL =
   `https://raw.githubusercontent.com/denoland/deno/${kDenoVersion}/cli/schemas`;
 const kConfigFileSchemaURL = `${kBaseURL}/config-file.v1.json`;

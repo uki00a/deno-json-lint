@@ -2,5 +2,9 @@
   "lock": false,
   "tasks": {
     "with-allow-all": "deno run --allow-all src/cli.ts"
+  },
+  "test": {
+    "sanitizeOps": true,
+    "sanitizeResources": true
   }
 }
