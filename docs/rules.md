@@ -26,3 +26,8 @@
 
 - **Description**: Enforces that `minimumDependencyAge` to be configured.
 - **Tags**: recommended, security, dependencies
+
+## `require-test-sanitizers`
+
+- **Description**: Enforces that test sanitizers to be enabled.
+- **Tags**: recommended

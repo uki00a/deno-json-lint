@@ -51,10 +51,15 @@ const kAllow = "allow" satisfies keyof Exclude<
 
 const kRequireLockfile = "require-lockfile";
 const kRequireMinimumDependencyAge = "require-minimum-dependency-age";
+const kRequireTestSanitizers = "require-test-sanitizers";
 const kNoRestrictedFields = "no-restricted-fields";
+/**
+ * Rules that are only applicable to the `deno.json` in the workspace root.
+ */
 export const kRootOnlyRules = [
   kRequireLockfile,
   kRequireMinimumDependencyAge,
+  kRequireTestSanitizers,
 ];
 
 export const kRootPath: JSONPath = [];
@@ -320,6 +325,84 @@ export const requireMinimumDependencyAge: LintRule = {
     if (node == null) {
       reporter.report({
         message: "`minimumDependencyAge` should be configured",
+      });
+    }
+  },
+};
+
+/**
+ * Enforces that test sanitizers to be enabled.
+ */
+export const requireTestSanitizers: LintRule = {
+  id: kRequireTestSanitizers,
+  tags: ["recommended"],
+  paths: () => [kRootPath],
+  lint(reporter, node) {
+    if (node == null) return;
+    const maybeTestNode = findNodeAtLocation(node, [kTest]);
+    const kSanitizeOps = "sanitizeOps" as const satisfies keyof NonNullable<
+      DenoConfigurationFileSchema["test"]
+    >;
+    const kSanitizeResources =
+      "sanitizeResources" as const satisfies keyof NonNullable<
+        DenoConfigurationFileSchema["test"]
+      >;
+    const kSanitizerOptions = [kSanitizeOps, kSanitizeResources];
+    const illegalNodeBySanitizer = new Map<
+      typeof kSanitizerOptions[number],
+      Node
+    >();
+    function foundIllegalNode(
+      node: Node,
+      prop: typeof kSanitizeOps | typeof kSanitizeResources,
+    ): void {
+      if (illegalNodeBySanitizer.has(prop)) return;
+      illegalNodeBySanitizer.set(prop, node);
+    }
+
+    if (maybeTestNode == null) {
+      foundIllegalNode(node, kSanitizeOps);
+      foundIllegalNode(node, kSanitizeResources);
+    } else {
+      const maybeSanitzeOpsNode = findNodeAtLocation(maybeTestNode, [
+        kSanitizeOps,
+      ]);
+      const maybeSanitizeResourcesNode = findNodeAtLocation(maybeTestNode, [
+        kSanitizeResources,
+      ]);
+      if (maybeSanitzeOpsNode == null && maybeSanitizeResourcesNode == null) {
+        foundIllegalNode(maybeTestNode, kSanitizeOps);
+        foundIllegalNode(maybeTestNode, kSanitizeResources);
+      } else if (maybeSanitzeOpsNode == null) {
+        foundIllegalNode(maybeTestNode, kSanitizeOps);
+      } else if (maybeSanitizeResourcesNode == null) {
+        foundIllegalNode(maybeTestNode, kSanitizeResources);
+      }
+
+      if (maybeSanitzeOpsNode != null) {
+        const value = getNodeValue(maybeSanitzeOpsNode);
+        if (value !== true) {
+          foundIllegalNode(maybeSanitzeOpsNode, kSanitizeOps);
+        }
+      }
+
+      if (maybeSanitizeResourcesNode != null) {
+        const value = getNodeValue(maybeSanitizeResourcesNode);
+        if (value !== true) {
+          foundIllegalNode(maybeSanitizeResourcesNode, kSanitizeResources);
+        }
+      }
+    }
+
+    const areAllSanitizersEnabled = illegalNodeBySanitizer.size === 0;
+    if (areAllSanitizersEnabled) {
+      return;
+    }
+
+    for (const [sanitizer, node] of illegalNodeBySanitizer) {
+      reporter.report({
+        node,
+        message: `\`test.${sanitizer}\` should be enabled`,
       });
     }
   },

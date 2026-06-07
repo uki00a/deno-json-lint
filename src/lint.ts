@@ -10,6 +10,7 @@ import {
   requireAllowList,
   requireLockfile,
   requireMinimumDependencyAge,
+  requireTestSanitizers,
 } from "./rules.ts";
 
 export interface Diagnostic {
@@ -38,6 +39,7 @@ export function lintText(
     requireAllowList,
     requireLockfile,
     requireMinimumDependencyAge,
+    requireTestSanitizers,
   ], options);
   const rulesGroupedByPath: Record<string, {
     rules: Array<LintRule>;
