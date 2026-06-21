@@ -1,7 +1,7 @@
 import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import { bold, red, yellow } from "@std/fmt/colors";
-import { lintText } from "./lint.ts";
+import { applyFixes, computeFixes, kIncludeNode, lintText } from "./lint.ts";
 import type { Config as DenoJsonLintConfig } from "./config.ts";
 import { kConfigKey, mergeConfigs } from "./config.ts";
 import { kRootOnlyRules } from "./rules.ts";
@@ -19,6 +19,7 @@ interface Options {
   cwd?: string;
   logger?: Logger;
   target?: string;
+  fix?: boolean;
 }
 
 const kDenoJSON = "deno.json";
@@ -48,6 +49,7 @@ async function main({
   cwd = Deno.cwd(),
   logger = console,
   target,
+  fix,
 }: Options): Promise<ExitCode> {
   const allowedPaths: Array<string> = [];
   for (const configFilename of target ? [target] : [kDenoJSON, kDenoJSONC]) {
@@ -200,7 +202,7 @@ async function main({
   let exitCode: ExitCode = 0;
   for (const { path, content, config, parent } of denoJSONs) {
     const isRoot = parent == null;
-    const diagnostics = await lintText(
+    let diagnostics = lintText(
       content,
       {
         config: parent == null
@@ -209,9 +211,23 @@ async function main({
             ? mergeConfigs(parent.config, config)
             : config),
         exclude: isRoot ? undefined : kRootOnlyRules,
+        [kIncludeNode]: fix === true,
       },
     );
     if (diagnostics.length === 0) continue;
+
+    if (fix) {
+      const { fixes, unfixableDiagnostics } = computeFixes(diagnostics);
+      if (fixes.length > 0) {
+        const fixed = applyFixes(content, fixes);
+        if (fixed !== content) {
+          await Deno.writeTextFile(path, fixed);
+        }
+        const areAllDiagnosticsFixed = unfixableDiagnostics.length === 0;
+        if (areAllDiagnosticsFixed) continue;
+        diagnostics = unfixableDiagnostics;
+      }
+    }
 
     const relativePath = relative(cwd, path);
     for (const diagnostic of diagnostics) {
@@ -243,13 +259,17 @@ async function main({
 
 if (import.meta.main) {
   const logger = console;
-  const { positionals } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: Deno.args,
     allowPositionals: true,
+    options: {
+      fix: { type: "boolean", default: false },
+    },
   });
   main({
     logger,
     target: positionals[0],
+    fix: values.fix,
   }).then((exitCode) => {
     Deno.exit(exitCode);
   });
