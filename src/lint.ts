@@ -1,17 +1,14 @@
-import type { JSONPath } from "jsonc-parser";
-import { findNodeAtLocation, parseTree } from "jsonc-parser";
+import type { EditResult, JSONPath, Node } from "jsonc-parser";
+import {
+  applyEdits,
+  findNodeAtLocation,
+  format,
+  parseTree,
+} from "jsonc-parser";
 import { LinesAndColumns } from "lines-and-columns";
 import type { Config as DenoJsonLintConfig } from "./config.ts";
 import type { LintContext, LintRule } from "./rules.ts";
-import {
-  banAllowAll,
-  kRootPath,
-  noRestrictedFields,
-  requireAllowList,
-  requireLockfile,
-  requireMinimumDependencyAge,
-  requireTestSanitizers,
-} from "./rules.ts";
+import { getAllRules, kRootPath, supportsFix } from "./rules.ts";
 
 export interface Diagnostic {
   id: string;
@@ -20,27 +17,49 @@ export interface Diagnostic {
   column?: number;
 }
 
+/**
+ * @private
+ * @deprecated TODO: This was introduced to allow {@linkcode Node} to be returned when `--fix` is executed, but it is not ideal because it exposes implementation details.
+ */
+interface InternalDiagnostic extends Diagnostic {
+  node?: Node;
+}
+
+/** @private */
+export const kIncludeNode = Symbol("deno-json-lint.includeNode");
 export interface LintOptions {
   include?: Array<string>;
   exclude?: Array<string>;
   config?: DenoJsonLintConfig;
 }
 
+/**
+ * @private
+ * @deprecated This was introduced to allow {@linkcode Node} to be returned when `--fix` is executed, but it is not ideal because it exposes implementation details.
+ */
+interface InternalLintOptions extends LintOptions {
+  /** @private */
+  [kIncludeNode]?: boolean;
+}
+
 export function lintText(
   configAsText: string,
   options?: LintOptions,
-): Array<Diagnostic> {
+): Array<Diagnostic>;
+export function lintText(
+  configAsText: string,
+  options: InternalLintOptions,
+): Array<InternalDiagnostic>;
+export function lintText(
+  configAsText: string,
+  options?: LintOptions | InternalLintOptions,
+): Array<Diagnostic | InternalDiagnostic> {
   const tree = parseTree(configAsText);
   if (tree == null) return [];
   const lines = new LinesAndColumns(configAsText);
-  const rules = determineRules([
-    banAllowAll,
-    noRestrictedFields,
-    requireAllowList,
-    requireLockfile,
-    requireMinimumDependencyAge,
-    requireTestSanitizers,
-  ], options);
+  const shouldIncludeNodes = options != null &&
+    (options as InternalLintOptions)[kIncludeNode] === true;
+  const rules = determineRules(getAllRules(), options);
   const rulesGroupedByPath: Record<string, {
     rules: Array<LintRule>;
     path: JSONPath;
@@ -70,12 +89,16 @@ export function lintText(
           const column = maybeLocation?.column
             ? maybeLocation.column + 1
             : undefined;
-          diagnostics.push({
+          const diagnostic: InternalDiagnostic = {
             ...problem,
             id: rule.id,
             line,
             column,
-          });
+          };
+          if (shouldIncludeNodes) {
+            diagnostic.node = node;
+          }
+          diagnostics.push(diagnostic);
         },
       };
       rule.lint(context, node);
@@ -105,6 +128,67 @@ export function lintText(
     }
   });
   return diagnostics;
+}
+
+interface Fix {
+  id: string;
+  edits: EditResult;
+}
+interface ComputedFixes {
+  unfixableDiagnostics: Array<Diagnostic>;
+  fixes: Array<Fix>;
+}
+export function computeFixes(
+  diagnostics: Array<InternalDiagnostic>,
+): ComputedFixes {
+  if (diagnostics.length === 0) return { unfixableDiagnostics: [], fixes: [] };
+  const ruleIds = diagnostics.reduce((ruleIds, x) => {
+    ruleIds.add(x.id);
+    return ruleIds;
+  }, new Set<string>());
+  const fixableRuleById = getAllRules().reduce((fixableRuleById, rule) => {
+    if (ruleIds.has(rule.id) && supportsFix(rule)) {
+      fixableRuleById.set(rule.id, rule);
+    }
+    return fixableRuleById;
+  }, new Map<string, LintRule>());
+  if (fixableRuleById.size === 0) {
+    return { unfixableDiagnostics: diagnostics, fixes: [] };
+  }
+
+  return diagnostics.reduce((result: ComputedFixes, x) => {
+    const maybeRule = fixableRuleById.get(x.id);
+    if (maybeRule == null || maybeRule.fix == null || x.node == null) {
+      result.unfixableDiagnostics.push(x);
+      return result;
+    }
+
+    const edits = maybeRule.fix(x.node);
+    result.fixes.push({ id: x.id, edits });
+    return result;
+  }, { fixes: [], unfixableDiagnostics: [] });
+}
+
+export function applyFixes(
+  configAsText: string,
+  fixes: Array<Fix>,
+): string {
+  if (fixes.length === 0) return configAsText;
+  const fixed = fixes.reduce((configAsText, fix) => {
+    return applyEdits(configAsText, fix.edits);
+  }, configAsText);
+  const formatted = applyEdits(
+    fixed,
+    // TODO: Read `fmt` field in `deno.json` and adjust the options accordingly.
+    format(fixed, {
+      offset: 0,
+      length: fixed.length,
+    }, {
+      tabSize: 2,
+      insertSpaces: true,
+    }),
+  );
+  return formatted;
 }
 
 function determineRules(

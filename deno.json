@@ -45,7 +45,8 @@
   "test": {
     "permissions": {
       "run": ["deno"],
-      "read": ["testdata"]
+      "read": ["testdata", "tmp/deno.fix.json"],
+      "write": ["tmp/deno.fix.json"]
     },
     "sanitizeOps": true,
     "sanitizeResources": true

@@ -1,5 +1,5 @@
 import { parseArgsStringToArgv } from "string-argv";
-import type { JSONPath, Node } from "jsonc-parser";
+import type { EditResult, JSONPath, Node } from "jsonc-parser";
 import { findNodeAtLocation, getNodePath, getNodeValue } from "jsonc-parser";
 import { findLaxPermissionFlags, isAllowAllFlag } from "./permissions.ts";
 import type {
@@ -30,6 +30,22 @@ export interface LintRule<T = unknown> {
   lint(reporter: LintContext<T>, node: Node | undefined): void;
   paths(): Array<JSONPath>;
   defaultOptions?: T;
+  fix?: (node: Node) => EditResult;
+}
+
+export function getAllRules(): Array<LintRule> {
+  return [
+    banAllowAll,
+    noRestrictedFields,
+    requireAllowList,
+    requireLockfile,
+    requireMinimumDependencyAge,
+    requireTestSanitizers,
+  ];
+}
+
+export function supportsFix(rule: LintRule): boolean {
+  return typeof rule.fix === "function";
 }
 
 const kTasks = "tasks" satisfies keyof DenoConfigurationFileSchema;
@@ -48,6 +64,7 @@ const kAllow = "allow" satisfies keyof Exclude<
   NonNullable<DenoConfigurationFileSchema["allowScripts"]>,
   boolean | AllowScriptsList
 >;
+const kLock = "lock" satisfies keyof DenoConfigurationFileSchema;
 
 const kRequireLockfile = "require-lockfile";
 const kRequireMinimumDependencyAge = "require-minimum-dependency-age";
@@ -284,7 +301,7 @@ export const requireLockfile: LintRule = {
   id: kRequireLockfile,
   tags: ["recommended", "security", "dependencies"],
   paths: () => [
-    ["lock" satisfies keyof DenoConfigurationFileSchema],
+    [kLock],
     [kTasks],
   ],
   lint(reporter, node) {
@@ -309,6 +326,22 @@ export const requireLockfile: LintRule = {
         node,
       });
     }
+  },
+  fix(node) {
+    const path = getNodePath(node);
+    if (
+      path[0] === kLock &&
+      getNodeValue(node) === false && node.parent != null
+    ) {
+      return [
+        {
+          offset: node.parent.offset,
+          length: node.parent.length,
+          content: "",
+        },
+      ];
+    }
+    return [];
   },
 };
 
