@@ -1,10 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  applyFixes,
-  computeFixes,
-  kIncludeNode,
-  lintText,
-} from "../../src/lint.ts";
+import { applyFixes, lintAndFixText, lintText } from "../../src/lint.ts";
 
 Deno.test({
   name: "require-lockfile",
@@ -61,13 +56,19 @@ Deno.test({
       const given = `{
   "lock": false
 }`;
-      const diagnostics = lintText(given, {
+      const {
+        unfixableDiagnostics,
+        fixes,
+      } = lintAndFixText(given, {
         include: ["require-lockfile"],
-        [kIncludeNode]: true,
       });
-      const { fixes } = computeFixes(diagnostics);
       const actual = applyFixes(given, fixes);
       assert.strictEqual(actual, `{}`);
+      assert.deepEqual(
+        unfixableDiagnostics,
+        [],
+        "All diagnostics should be fixed",
+      );
     });
   },
 });

@@ -17,48 +17,43 @@ export interface Diagnostic {
   column?: number;
 }
 
-/**
- * @private
- * @deprecated TODO: This was introduced to allow {@linkcode Node} to be returned when `--fix` is executed, but it is not ideal because it exposes implementation details.
- */
-interface InternalDiagnostic extends Diagnostic {
-  node?: Node;
-}
-
-/** @private */
-export const kIncludeNode = Symbol("deno-json-lint.includeNode");
 export interface LintOptions {
   include?: Array<string>;
   exclude?: Array<string>;
   config?: DenoJsonLintConfig;
 }
 
-/**
- * @private
- * @deprecated This was introduced to allow {@linkcode Node} to be returned when `--fix` is executed, but it is not ideal because it exposes implementation details.
- */
-interface InternalLintOptions extends LintOptions {
-  /** @private */
-  [kIncludeNode]?: boolean;
+interface LintAndFixResult {
+  unfixableDiagnostics: Array<Diagnostic>;
+  fixes: Array<Fix>;
+}
+
+export function lintAndFixText(
+  configAsText: string,
+  options?: LintOptions,
+): LintAndFixResult {
+  const tree = parseTree(configAsText);
+  if (tree == null) return { fixes: [], unfixableDiagnostics: [] };
+  const lines = new LinesAndColumns(configAsText);
+  const diagnostics = lintTree(tree, lines, options);
+  return computeFixes(tree, diagnostics);
 }
 
 export function lintText(
   configAsText: string,
   options?: LintOptions,
-): Array<Diagnostic>;
-export function lintText(
-  configAsText: string,
-  options: InternalLintOptions,
-): Array<InternalDiagnostic>;
-export function lintText(
-  configAsText: string,
-  options?: LintOptions | InternalLintOptions,
-): Array<Diagnostic | InternalDiagnostic> {
+): Array<Diagnostic> {
   const tree = parseTree(configAsText);
   if (tree == null) return [];
   const lines = new LinesAndColumns(configAsText);
-  const shouldIncludeNodes = options != null &&
-    (options as InternalLintOptions)[kIncludeNode] === true;
+  return lintTree(tree, lines, options);
+}
+
+function lintTree(
+  tree: Node,
+  lines: LinesAndColumns,
+  options?: LintOptions,
+): Array<Diagnostic> {
   const rules = determineRules(getAllRules(), options);
   const rulesGroupedByPath: Record<string, {
     rules: Array<LintRule>;
@@ -89,15 +84,12 @@ export function lintText(
           const column = maybeLocation?.column
             ? maybeLocation.column + 1
             : undefined;
-          const diagnostic: InternalDiagnostic = {
+          const diagnostic: Diagnostic = {
             ...problem,
             id: rule.id,
             line,
             column,
           };
-          if (shouldIncludeNodes) {
-            diagnostic.node = node;
-          }
           diagnostics.push(diagnostic);
         },
       };
@@ -134,13 +126,10 @@ interface Fix {
   id: string;
   edits: EditResult;
 }
-interface ComputedFixes {
-  unfixableDiagnostics: Array<Diagnostic>;
-  fixes: Array<Fix>;
-}
-export function computeFixes(
-  diagnostics: Array<InternalDiagnostic>,
-): ComputedFixes {
+function computeFixes(
+  tree: Node,
+  diagnostics: Array<Diagnostic>,
+): LintAndFixResult {
   if (diagnostics.length === 0) return { unfixableDiagnostics: [], fixes: [] };
   const ruleIds = diagnostics.reduce((ruleIds, x) => {
     ruleIds.add(x.id);
@@ -156,14 +145,14 @@ export function computeFixes(
     return { unfixableDiagnostics: diagnostics, fixes: [] };
   }
 
-  return diagnostics.reduce((result: ComputedFixes, x) => {
+  return diagnostics.reduce((result: LintAndFixResult, x) => {
     const maybeRule = fixableRuleById.get(x.id);
-    if (maybeRule == null || maybeRule.fix == null || x.node == null) {
+    if (maybeRule == null || maybeRule.fix == null) {
       result.unfixableDiagnostics.push(x);
       return result;
     }
 
-    const edits = maybeRule.fix(x.node);
+    const edits = maybeRule.fix(tree);
     result.fixes.push({ id: x.id, edits });
     return result;
   }, { fixes: [], unfixableDiagnostics: [] });
@@ -174,9 +163,8 @@ export function applyFixes(
   fixes: Array<Fix>,
 ): string {
   if (fixes.length === 0) return configAsText;
-  const fixed = fixes.reduce((configAsText, fix) => {
-    return applyEdits(configAsText, fix.edits);
-  }, configAsText);
+  const edits = fixes.flatMap((x) => x.edits);
+  const fixed = applyEdits(configAsText, edits);
   const formatted = applyEdits(
     fixed,
     // TODO: Read `fmt` field in `deno.json` and adjust the options accordingly.

@@ -159,14 +159,15 @@ Deno.test({
 
         {
           const actual = await Deno.readTextFile(target);
-          const expected = `{}`;
+          const expected = `{
+  "minimumDependencyAge": 1440
+}`;
           assert.strictEqual(actual, expected);
         }
 
         {
           const actual = decoder.decode(stderr).trim();
           const expected = [
-            `${target}: [require-minimum-dependency-age] \`minimumDependencyAge\` should be configured`,
             `${target}: [require-test-sanitizers] \`test.sanitizeOps\` should be enabled`,
             `${target}: [require-test-sanitizers] \`test.sanitizeResources\` should be enabled`,
           ].join("\n");
