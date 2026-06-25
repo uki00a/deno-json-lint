@@ -30,7 +30,7 @@ export interface LintRule<T = unknown> {
   lint(reporter: LintContext<T>, node: Node | undefined): void;
   paths(): Array<JSONPath>;
   defaultOptions?: T;
-  fix?: (node: Node) => EditResult;
+  fix?: (tree: Node) => EditResult;
 }
 
 export function getAllRules(): Array<LintRule> {
@@ -65,6 +65,8 @@ const kAllow = "allow" satisfies keyof Exclude<
   boolean | AllowScriptsList
 >;
 const kLock = "lock" satisfies keyof DenoConfigurationFileSchema;
+const kMinimumDependencyAge =
+  "minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema;
 
 const kRequireLockfile = "require-lockfile";
 const kRequireMinimumDependencyAge = "require-minimum-dependency-age";
@@ -327,11 +329,10 @@ export const requireLockfile: LintRule = {
       });
     }
   },
-  fix(node) {
-    const path = getNodePath(node);
+  fix(tree) {
+    const node = findNodeAtLocation(tree, [kLock]);
     if (
-      path[0] === kLock &&
-      getNodeValue(node) === false && node.parent != null
+      node?.parent != null
     ) {
       return [
         {
@@ -352,14 +353,29 @@ export const requireMinimumDependencyAge: LintRule = {
   id: kRequireMinimumDependencyAge,
   tags: ["recommended", "security", "dependencies"],
   paths: () => [
-    ["minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema],
+    [kMinimumDependencyAge],
   ],
   lint(reporter, node) {
     if (node == null) {
       reporter.report({
-        message: "`minimumDependencyAge` should be configured",
+        message: `\`${kMinimumDependencyAge}\` should be configured`,
       });
     }
+  },
+  fix(tree) {
+    /**
+     * This is the default value for `minimumReleaseAge` in pnpm.
+     */
+    const defaultMinimumDependencyAge = 1440;
+    const content =
+      `"${kMinimumDependencyAge}": ${defaultMinimumDependencyAge}`;
+    return [
+      {
+        offset: tree.length - 1,
+        length: 0,
+        content,
+      },
+    ];
   },
 };
 

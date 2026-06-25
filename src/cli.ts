@@ -1,7 +1,8 @@
 import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import { bold, red, yellow } from "@std/fmt/colors";
-import { applyFixes, computeFixes, kIncludeNode, lintText } from "./lint.ts";
+import type { LintOptions } from "./lint.ts";
+import { applyFixes, lintAndFixText, lintText } from "./lint.ts";
 import type { Config as DenoJsonLintConfig } from "./config.ts";
 import { kConfigKey, mergeConfigs } from "./config.ts";
 import { kRootOnlyRules } from "./rules.ts";
@@ -202,31 +203,33 @@ async function main({
   let exitCode: ExitCode = 0;
   for (const { path, content, config, parent } of denoJSONs) {
     const isRoot = parent == null;
-    let diagnostics = lintText(
-      content,
-      {
-        config: parent == null
-          ? config
-          : (parent.config && config
-            ? mergeConfigs(parent.config, config)
-            : config),
-        exclude: isRoot ? undefined : kRootOnlyRules,
-        [kIncludeNode]: fix === true,
-      },
-    );
+    const lintOptions: LintOptions = {
+      config: parent == null
+        ? config
+        : (parent.config && config
+          ? mergeConfigs(parent.config, config)
+          : config),
+      exclude: isRoot ? undefined : kRootOnlyRules,
+    };
+    const {
+      fixes,
+      unfixableDiagnostics: diagnostics,
+    } = fix ? lintAndFixText(content, lintOptions) : {
+      unfixableDiagnostics: lintText(
+        content,
+        lintOptions,
+      ),
+      fixes: [],
+    };
     if (diagnostics.length === 0) continue;
 
-    if (fix) {
-      const { fixes, unfixableDiagnostics } = computeFixes(diagnostics);
-      if (fixes.length > 0) {
-        const fixed = applyFixes(content, fixes);
-        if (fixed !== content) {
-          await Deno.writeTextFile(path, fixed);
-        }
-        const areAllDiagnosticsFixed = unfixableDiagnostics.length === 0;
-        if (areAllDiagnosticsFixed) continue;
-        diagnostics = unfixableDiagnostics;
+    if (fixes.length > 0) {
+      const fixed = applyFixes(content, fixes);
+      if (fixed !== content) {
+        await Deno.writeTextFile(path, fixed);
       }
+      const areAllDiagnosticsFixed = diagnostics.length === 0;
+      if (areAllDiagnosticsFixed) continue;
     }
 
     const relativePath = relative(cwd, path);
