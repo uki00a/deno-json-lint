@@ -40,6 +40,7 @@ Deno.test({
       const given = `{}`;
       const { fixes, unfixableDiagnostics } = lintAndFixText(given, {
         include: ["require-minimum-dependency-age"],
+        denoVersion: "2.8.3",
       });
       const actual = applyFixes(given, fixes);
       const expected = `{

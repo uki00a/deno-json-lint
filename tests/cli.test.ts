@@ -24,7 +24,6 @@ Deno.test({
 
       const actual = decoder.decode(stderr).trim();
       const expected = [
-        `${target}: [require-minimum-dependency-age] \`minimumDependencyAge\` should be configured`,
         `${target}:2:11: [require-lockfile] A lockfile should be enabled`,
         `${target}:4:23: [ban-allow-all] --allow-all/-A should not be used`,
       ].join("\n");
@@ -99,7 +98,7 @@ Deno.test({
 
         const actual = decoder.decode(stderr).trim();
         const expected =
-          `${target}: [require-minimum-dependency-age] \`minimumDependencyAge\` should be configured`;
+          `${target}:2:11: [require-lockfile] A lockfile should be enabled`;
         assert.equal(actual, expected);
       },
     );
@@ -159,9 +158,7 @@ Deno.test({
 
         {
           const actual = await Deno.readTextFile(target);
-          const expected = `{
-  "minimumDependencyAge": 1440
-}`;
+          const expected = `{}`;
           assert.strictEqual(actual, expected);
         }
 
