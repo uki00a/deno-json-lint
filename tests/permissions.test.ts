@@ -31,14 +31,17 @@ Deno.test({
   },
 });
 
-Deno.test({
-  name: "isAllowAllFlag",
+Deno.test.each(
+  [
+    ["--allow-all", true],
+    ["-A", true],
+    ["-rAq", true],
+    ["--allow-allx", false],
+    ["--allow-read", false],
+  ],
+)('isAllowAllFlag("%s")', {
   permissions: "none",
-  fn: () => {
-    assert(isAllowAllFlag("--allow-all"));
-    assert(isAllowAllFlag("-A"));
-    assert(isAllowAllFlag("-rAq"));
-    assert(!isAllowAllFlag("--allow-allx"));
-    assert(!isAllowAllFlag("--allow-read"));
-  },
+}, (given, expected) => {
+  const actual = isAllowAllFlag(given);
+  assert.equal(actual, expected);
 });
