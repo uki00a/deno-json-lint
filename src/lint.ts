@@ -21,6 +21,7 @@ export interface LintOptions {
   include?: Array<string>;
   exclude?: Array<string>;
   config?: DenoJsonLintConfig;
+  denoVersion?: string;
 }
 
 interface LintAndFixResult {
@@ -67,6 +68,7 @@ function lintTree(
       rulesGroupedByPath[key].rules.push(rule);
     }
   }
+  const denoVersion = options?.denoVersion ?? Deno.version.deno;
   const diagnostics: Array<Diagnostic> = [];
   for (const [key, { rules, path }] of Object.entries(rulesGroupedByPath)) {
     const node = key === rootKey ? tree : findNodeAtLocation(tree, path);
@@ -77,6 +79,7 @@ function lintTree(
         : rule.defaultOptions;
       const context: LintContext = {
         options: maybeRuleOptions ?? rule.defaultOptions,
+        denoVersion,
         report(data) {
           const { node, ...problem } = data;
           const maybeLocation = node && lines.locationForIndex(node.offset);

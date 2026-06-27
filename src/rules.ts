@@ -1,3 +1,5 @@
+import { parse as parseSemver } from "@std/semver/parse";
+import { greaterOrEqual as semverGreaterOrEqual } from "@std/semver/greater-or-equal";
 import { parseArgsStringToArgv } from "string-argv";
 import type { EditResult, JSONPath, Node } from "jsonc-parser";
 import { findNodeAtLocation, getNodePath, getNodeValue } from "jsonc-parser";
@@ -22,6 +24,7 @@ interface LintReport {
 export interface LintContext<T = unknown> {
   report(data: LintReport): void;
   readonly options: T;
+  readonly denoVersion: string;
 }
 
 export interface LintRule<T = unknown> {
@@ -357,6 +360,11 @@ export const requireMinimumDependencyAge: LintRule = {
   ],
   lint(reporter, node) {
     if (node == null) {
+      const isMinimumDependencyAgeEnabledByDefault = semverGreaterOrEqual(
+        parseSemver(reporter.denoVersion),
+        parseSemver("2.9.0"),
+      );
+      if (isMinimumDependencyAgeEnabledByDefault) return;
       reporter.report({
         message: `\`${kMinimumDependencyAge}\` should be configured`,
       });
