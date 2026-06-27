@@ -2,8 +2,7 @@
   "lock": false,
   "deno-json-lint": {
     "rules": {
-      "require-lockfile": "off",
-      "require-minimum-dependency-age": "warn",
+      "require-lockfile": "warn",
       "require-test-sanitizers": "off"
     }
   }
