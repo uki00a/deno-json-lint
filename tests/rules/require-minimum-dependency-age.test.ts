@@ -19,6 +19,28 @@ Deno.test({
       },
     );
 
+    await t.step(
+      "disallows `minimumDependencyAge: 0` if the Deno version is greater than or equal to 2.9.0",
+      () => {
+        const given = `{
+  "minimumDependencyAge": 0
+}`;
+        const actual = lintText(given, {
+          include: ["require-minimum-dependency-age"],
+          denoVersion: "2.9.0",
+        });
+        const expected: Array<Diagnostic> = [
+          {
+            id: "require-minimum-dependency-age",
+            message: "`minimumDependencyAge` should be enabled",
+            line: undefined,
+            column: undefined,
+          },
+        ];
+        assert.deepEqual(actual, expected);
+      },
+    );
+
     await t.step("encourages defining `minimumDependencyAge`", () => {
       const given = "{}";
       const actual = lintText(given, {
@@ -36,21 +58,49 @@ Deno.test({
       assert.deepEqual(actual, expected);
     });
 
-    await t.step("supports `--fix`", () => {
-      const given = `{}`;
-      const { fixes, unfixableDiagnostics } = lintAndFixText(given, {
-        include: ["require-minimum-dependency-age"],
-        denoVersion: "2.8.3",
-      });
-      const actual = applyFixes(given, fixes);
-      const expected = `{
+    await t.step("supports `--fix`", async (t) => {
+      await t.step(
+        "automatically defines `minimumDependencyAge` if the Deno version is less than 2.9.0",
+        () => {
+          const given = `{}`;
+          const { fixes, unfixableDiagnostics } = lintAndFixText(given, {
+            include: ["require-minimum-dependency-age"],
+            denoVersion: "2.8.3",
+          });
+          const actual = applyFixes(given, fixes);
+          const expected = `{
   "minimumDependencyAge": 1440
 }`;
-      assert.strictEqual(actual, expected);
-      assert.deepEqual(
-        unfixableDiagnostics,
-        [],
-        "All diagnostics should be fixed",
+          assert.strictEqual(actual, expected);
+          assert.deepEqual(
+            unfixableDiagnostics,
+            [],
+            "All diagnostics should be fixed",
+          );
+        },
+      );
+
+      await t.step(
+        "should fix `minimumDependencyAge: 0` if the Deno version is greater than or equal to 2.9.0",
+        () => {
+          const given = `{
+  "minimumDependencyAge": 0
+}`;
+          const { fixes, unfixableDiagnostics } = lintAndFixText(given, {
+            include: ["require-minimum-dependency-age"],
+            denoVersion: "2.9.0",
+          });
+          const actual = applyFixes(given, fixes);
+          const expected = `{
+  "minimumDependencyAge": 1440
+}`;
+          assert.strictEqual(actual, expected);
+          assert.deepEqual(
+            unfixableDiagnostics,
+            [],
+            "All diagnostics should be fixed",
+          );
+        },
       );
     });
   },

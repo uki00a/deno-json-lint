@@ -349,6 +349,15 @@ export const requireLockfile: LintRule = {
   },
 };
 
+function isMinimumDependencyAgeEnabledByDefault(
+  denoVersion: string,
+): boolean {
+  return semverGreaterOrEqual(
+    parseSemver(denoVersion),
+    parseSemver("2.9.0"),
+  );
+}
+
 /**
  * Enforces that `minimumDependencyAge` to be configured.
  */
@@ -359,29 +368,48 @@ export const requireMinimumDependencyAge: LintRule = {
     [kMinimumDependencyAge],
   ],
   lint(reporter, node) {
+    const isEnabledByDefault = isMinimumDependencyAgeEnabledByDefault(
+      reporter.denoVersion,
+    );
     if (node == null) {
-      const isMinimumDependencyAgeEnabledByDefault = semverGreaterOrEqual(
-        parseSemver(reporter.denoVersion),
-        parseSemver("2.9.0"),
-      );
-      if (isMinimumDependencyAgeEnabledByDefault) return;
+      if (isEnabledByDefault) return;
       reporter.report({
         message: `\`${kMinimumDependencyAge}\` should be configured`,
       });
+    } else if (isEnabledByDefault) {
+      const minimumDependencyAge = getNodeValue(node);
+      const isDisabled = minimumDependencyAge === 0;
+      if (isDisabled) {
+        reporter.report({
+          message: `\`${kMinimumDependencyAge}\` should be enabled`,
+        });
+      }
     }
   },
   fix(tree) {
+    const maybeMinimumDependencyAgeNode = findNodeAtLocation(tree, [
+      kMinimumDependencyAge,
+    ]);
     /**
      * This is the default value for `minimumReleaseAge` in pnpm.
      */
     const defaultMinimumDependencyAge = 1440;
     const content =
       `"${kMinimumDependencyAge}": ${defaultMinimumDependencyAge}`;
+    if (maybeMinimumDependencyAgeNode == null) {
+      return [
+        {
+          offset: tree.length - 1,
+          length: 0,
+          content,
+        },
+      ];
+    }
     return [
       {
-        offset: tree.length - 1,
-        length: 0,
-        content,
+        offset: maybeMinimumDependencyAgeNode.offset,
+        length: maybeMinimumDependencyAgeNode.length,
+        content: `${defaultMinimumDependencyAge}`,
       },
     ];
   },
