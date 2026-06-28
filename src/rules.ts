@@ -409,7 +409,7 @@ export const requireMinimumDependencyAge: LintRule = {
       {
         offset: maybeMinimumDependencyAgeNode.offset,
         length: maybeMinimumDependencyAgeNode.length,
-        content: defaultMinimumDependencyAge,
+        content: `${defaultMinimumDependencyAge}`,
       },
     ];
   },
