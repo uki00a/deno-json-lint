@@ -415,6 +415,13 @@ export const requireMinimumDependencyAge: LintRule = {
   },
 };
 
+function areTestSanitizersDisabledByDefault(denoVersion: string): boolean {
+  return semverGreaterOrEqual(
+    parseSemver(denoVersion),
+    parseSemver("2.8.0"),
+  );
+}
+
 /**
  * Enforces that test sanitizers to be enabled.
  */
@@ -424,6 +431,9 @@ export const requireTestSanitizers: LintRule = {
   paths: () => [kRootPath],
   lint(reporter, node) {
     if (node == null) return;
+    const areTestSanitizersEnabledByDefault =
+      !areTestSanitizersDisabledByDefault(reporter.denoVersion);
+    if (areTestSanitizersEnabledByDefault) return;
     const maybeTestNode = findNodeAtLocation(node, [kTest]);
     const kSanitizeOps = "sanitizeOps" as const satisfies keyof NonNullable<
       DenoConfigurationFileSchema["test"]

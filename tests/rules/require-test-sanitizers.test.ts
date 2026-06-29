@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import type { Diagnostic } from "../../src/lint.ts";
 import { lintText } from "../../src/lint.ts";
 
 Deno.test({
@@ -126,6 +127,19 @@ Deno.test({
             column: 13,
           },
         ];
+        assert.deepEqual(actual, expected);
+      },
+    );
+
+    await t.step(
+      "allows `test.sanitizeOps` and `test.sanitizeResources` to be omitted if the Deno version is less than 2.8.0",
+      () => {
+        const given = "{}";
+        const actual = lintText(given, {
+          include: ["require-test-sanitizers"],
+          denoVersion: "2.7.14",
+        });
+        const expected: Array<Diagnostic> = [];
         assert.deepEqual(actual, expected);
       },
     );
