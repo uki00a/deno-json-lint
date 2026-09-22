@@ -46,12 +46,13 @@ interface FoundWorkspace {
 }
 
 type ExitCode = 1 | 0;
-async function main({
-  cwd = Deno.cwd(),
-  logger = console,
-  target,
-  fix,
-}: Options): Promise<ExitCode> {
+async function main(options: Options): Promise<ExitCode> {
+  const {
+    cwd = Deno.cwd(),
+    logger = console,
+    target,
+    fix,
+  } = options;
   const allowedPaths: Array<string> = [];
   for (const configFilename of target ? [target] : [kDenoJSON, kDenoJSONC]) {
     const path = join(cwd, configFilename);
@@ -211,9 +212,10 @@ async function main({
           : config),
       exclude: isRoot ? undefined : kRootOnlyRules,
     };
+
     const {
       fixes,
-      unfixableDiagnostics: diagnostics,
+      unfixableDiagnostics,
     } = fix ? lintAndFixText(content, lintOptions) : {
       unfixableDiagnostics: lintText(
         content,
@@ -221,8 +223,7 @@ async function main({
       ),
       fixes: [],
     };
-    if (diagnostics.length === 0) continue;
-
+    let diagnostics = unfixableDiagnostics;
     if (fixes.length > 0) {
       const fixed = applyFixes(content, fixes);
       if (fixed !== content) {
@@ -230,7 +231,17 @@ async function main({
       }
       const areAllDiagnosticsFixed = diagnostics.length === 0;
       if (areAllDiagnosticsFixed) continue;
+
+      try {
+        // NOTE: Retrying `lintText()` to correct the reported rows and columns.
+        const content = await Deno.readTextFile(path);
+        diagnostics = lintText(content, lintOptions);
+      } catch (error) {
+        logger.error(error);
+        return 1;
+      }
     }
+    if (diagnostics.length === 0) continue;
 
     const relativePath = relative(cwd, path);
     for (const diagnostic of diagnostics) {

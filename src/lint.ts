@@ -10,6 +10,12 @@ import type { Config as DenoJsonLintConfig } from "./config.ts";
 import type { LintContext, LintRule } from "./rules.ts";
 import { getAllRules, kRootPath, supportsFix } from "./rules.ts";
 
+function assert(x: unknown): asserts x {
+  if (!x) {
+    throw new Error("[Bug] An assertion failed");
+  }
+}
+
 export interface Diagnostic {
   id: string;
   message: string;
@@ -37,7 +43,7 @@ export function lintAndFixText(
   if (tree == null) return { fixes: [], unfixableDiagnostics: [] };
   const lines = new LinesAndColumns(configAsText);
   const diagnostics = lintTree(tree, lines, options);
-  return computeFixes(tree, diagnostics);
+  return computeFixes(diagnostics);
 }
 
 export function lintText(
@@ -99,6 +105,11 @@ function lintTree(
       rule.lint(context, node);
     }
   }
+  sortDiagnosticsInPlace(diagnostics);
+  return diagnostics;
+}
+
+function sortDiagnosticsInPlace(diagnostics: Array<Diagnostic>): void {
   diagnostics.sort((a, b) => {
     if (a.line == null) {
       if (b.line == null) return a.id < b.id ? -1 : 1;
@@ -122,15 +133,13 @@ function lintTree(
       return a.line - b.line;
     }
   });
-  return diagnostics;
 }
 
 interface Fix {
   id: string;
-  edits: EditResult;
+  applyTo(tree: Node, content: string): EditResult;
 }
 function computeFixes(
-  tree: Node,
   diagnostics: Array<Diagnostic>,
 ): LintAndFixResult {
   if (diagnostics.length === 0) return { unfixableDiagnostics: [], fixes: [] };
@@ -148,6 +157,7 @@ function computeFixes(
     return { unfixableDiagnostics: diagnostics, fixes: [] };
   }
 
+  const seenFixableRuleIds = new Set<string>();
   return diagnostics.reduce((result: LintAndFixResult, x) => {
     const maybeRule = fixableRuleById.get(x.id);
     if (maybeRule == null || maybeRule.fix == null) {
@@ -155,8 +165,11 @@ function computeFixes(
       return result;
     }
 
-    const edits = maybeRule.fix(tree);
-    result.fixes.push({ id: x.id, edits });
+    const fix = maybeRule.fix.bind(maybeRule);
+    if (!seenFixableRuleIds.has(x.id)) {
+      result.fixes.push({ id: x.id, applyTo: fix });
+      seenFixableRuleIds.add(x.id);
+    }
     return result;
   }, { fixes: [], unfixableDiagnostics: [] });
 }
@@ -166,8 +179,13 @@ export function applyFixes(
   fixes: Array<Fix>,
 ): string {
   if (fixes.length === 0) return configAsText;
-  const edits = fixes.flatMap((x) => x.edits);
-  const fixed = applyEdits(configAsText, edits);
+  const fixed = fixes.reduce((text, fix) => {
+    // TODO: parses the JSON every time the loop iterates, which is very inefficient.
+    const tree = parseTree(text);
+    assert(tree);
+    const edits = fix.applyTo(tree, text);
+    return applyEdits(text, edits);
+  }, configAsText);
   const formatted = applyEdits(
     fixed,
     // TODO: Read `fmt` field in `deno.json` and adjust the options accordingly.

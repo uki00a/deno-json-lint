@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type { Diagnostic } from "../../src/lint.ts";
-import { lintText } from "../../src/lint.ts";
+import { applyFixes, lintAndFixText, lintText } from "../../src/lint.ts";
 
 Deno.test({
   name: "require-test-sanitizers",
@@ -143,5 +143,46 @@ Deno.test({
         assert.deepEqual(actual, expected);
       },
     );
+
+    await t.step("supports `--fix`", async (t) => {
+      await t.step(
+        "automatically enables `test.sanitizeOps` and `test.sanitizeResources`",
+        async (t) => {
+          for (
+            const given of [
+              "{}",
+              `{
+  "test": {}
+}`,
+              `{
+  "test": {
+    "sanitizeOps": false,
+    "sanitizeResources": false
+  }
+}`,
+            ]
+          ) {
+            await t.step(`given \`${given}\``, () => {
+              const { fixes, unfixableDiagnostics } = lintAndFixText(given, {
+                include: ["require-test-sanitizers"],
+              });
+              const actual = applyFixes(given, fixes);
+              const expected = `{
+  "test": {
+    "sanitizeOps": true,
+    "sanitizeResources": true
+  }
+}`;
+              assert.strictEqual(actual, expected);
+              assert.deepEqual(
+                unfixableDiagnostics,
+                [],
+                "All diagnostics should be fixed",
+              );
+            });
+          }
+        },
+      );
+    });
   },
 });
