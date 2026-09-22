@@ -139,7 +139,10 @@ Deno.test({
         await Deno.writeTextFile(
           target,
           `{
-  "lock": false
+  "lock": false,
+  "tasks": {
+    "ng": "deno run -A main.js"
+  }
         }`,
           { create: true },
         );
@@ -158,16 +161,22 @@ Deno.test({
 
         {
           const actual = await Deno.readTextFile(target);
-          const expected = `{}`;
+          const expected = `{
+  "tasks": {
+    "ng": "deno run -A main.js"
+  },
+  "test": {
+    "sanitizeOps": true,
+    "sanitizeResources": true
+  }
+}`;
           assert.strictEqual(actual, expected);
         }
 
         {
           const actual = decoder.decode(stderr).trim();
-          const expected = [
-            `${target}: [require-test-sanitizers] \`test.sanitizeOps\` should be enabled`,
-            `${target}: [require-test-sanitizers] \`test.sanitizeResources\` should be enabled`,
-          ].join("\n");
+          const expected =
+            `${target}:3:11: [ban-allow-all] --allow-all/-A should not be used`;
           assert.equal(
             actual,
             expected,

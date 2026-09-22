@@ -2,7 +2,12 @@ import { parse as parseSemver } from "@std/semver/parse";
 import { greaterOrEqual as semverGreaterOrEqual } from "@std/semver/greater-or-equal";
 import { parseArgsStringToArgv } from "string-argv";
 import type { EditResult, JSONPath, Node } from "jsonc-parser";
-import { findNodeAtLocation, getNodePath, getNodeValue } from "jsonc-parser";
+import {
+  findNodeAtLocation,
+  getNodePath,
+  getNodeValue,
+  modify,
+} from "jsonc-parser";
 import { findLaxPermissionFlags, isAllowAllFlag } from "./permissions.ts";
 import type {
   AllowScriptsList,
@@ -33,7 +38,15 @@ export interface LintRule<T = unknown> {
   lint(reporter: LintContext<T>, node: Node | undefined): void;
   paths(): Array<JSONPath>;
   defaultOptions?: T;
-  fix?: (tree: Node) => EditResult;
+  fix?: Fixer;
+}
+
+interface Fixer {
+  /**
+   * @param tree The root node of the JSON content
+   * @param content The plain text representation of {@linkcode tree}
+   */
+  (tree: Node, content: string): EditResult;
 }
 
 export function getAllRules(): Array<LintRule> {
@@ -70,6 +83,14 @@ const kAllow = "allow" satisfies keyof Exclude<
 const kLock = "lock" satisfies keyof DenoConfigurationFileSchema;
 const kMinimumDependencyAge =
   "minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema;
+const kSanitizeOps = "sanitizeOps" as const satisfies keyof NonNullable<
+  DenoConfigurationFileSchema["test"]
+>;
+const kSanitizeResources =
+  "sanitizeResources" as const satisfies keyof NonNullable<
+    DenoConfigurationFileSchema["test"]
+  >;
+const kSanitizerOptions = [kSanitizeOps, kSanitizeResources];
 
 const kRequireLockfile = "require-lockfile";
 const kRequireMinimumDependencyAge = "require-minimum-dependency-age";
@@ -332,18 +353,14 @@ export const requireLockfile: LintRule = {
       });
     }
   },
-  fix(tree) {
+  fix(tree, content) {
     const node = findNodeAtLocation(tree, [kLock]);
     if (
-      node?.parent != null
+      node?.parent?.parent != null
     ) {
-      return [
-        {
-          offset: node.parent.offset,
-          length: node.parent.length,
-          content: "",
-        },
-      ];
+      const { lock: _lock, ...configWithoutLockProperty } =
+        getNodeValue(node.parent.parent) || {};
+      return modify(content, [], configWithoutLockProperty, {});
     }
     return [];
   },
@@ -386,32 +403,17 @@ export const requireMinimumDependencyAge: LintRule = {
       }
     }
   },
-  fix(tree) {
-    const maybeMinimumDependencyAgeNode = findNodeAtLocation(tree, [
-      kMinimumDependencyAge,
-    ]);
+  fix(_tree, content) {
     /**
      * This is the default value for `minimumReleaseAge` in pnpm.
      */
     const defaultMinimumDependencyAge = 1440;
-    const content =
-      `"${kMinimumDependencyAge}": ${defaultMinimumDependencyAge}`;
-    if (maybeMinimumDependencyAgeNode == null) {
-      return [
-        {
-          offset: tree.length - 1,
-          length: 0,
-          content,
-        },
-      ];
-    }
-    return [
-      {
-        offset: maybeMinimumDependencyAgeNode.offset,
-        length: maybeMinimumDependencyAgeNode.length,
-        content: `${defaultMinimumDependencyAge}`,
-      },
-    ];
+    return modify(
+      content,
+      [kMinimumDependencyAge],
+      defaultMinimumDependencyAge,
+      {},
+    );
   },
 };
 
@@ -435,14 +437,6 @@ export const requireTestSanitizers: LintRule = {
       !areTestSanitizersDisabledByDefault(reporter.denoVersion);
     if (areTestSanitizersEnabledByDefault) return;
     const maybeTestNode = findNodeAtLocation(node, [kTest]);
-    const kSanitizeOps = "sanitizeOps" as const satisfies keyof NonNullable<
-      DenoConfigurationFileSchema["test"]
-    >;
-    const kSanitizeResources =
-      "sanitizeResources" as const satisfies keyof NonNullable<
-        DenoConfigurationFileSchema["test"]
-      >;
-    const kSanitizerOptions = [kSanitizeOps, kSanitizeResources];
     const illegalNodeBySanitizer = new Map<
       typeof kSanitizerOptions[number],
       Node
@@ -500,6 +494,32 @@ export const requireTestSanitizers: LintRule = {
         message: `\`test.${sanitizer}\` should be enabled`,
       });
     }
+  },
+  fix(tree, content) {
+    const maybeTestNode = findNodeAtLocation(tree, [kTest]);
+    if (maybeTestNode == null) {
+      return modify(
+        content,
+        [kTest],
+        kSanitizerOptions.reduce(
+          (testConfig: Record<string, unknown>, option) => {
+            testConfig[option] = true;
+            return testConfig;
+          },
+          {},
+        ),
+        {},
+      );
+    }
+
+    const testConfig = { ...getNodeValue(maybeTestNode) };
+    for (const option of kSanitizerOptions) {
+      const maybeOptionNode = findNodeAtLocation(maybeTestNode, [option]);
+      if (maybeOptionNode == null || getNodeValue(maybeOptionNode) !== true) {
+        testConfig[option] = true;
+      }
+    }
+    return modify(content, [kTest], testConfig, {});
   },
 };
 
