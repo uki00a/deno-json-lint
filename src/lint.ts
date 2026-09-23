@@ -205,6 +205,7 @@ function determineRules(
   options?: LintOptions,
 ): Array<LintRule> {
   if (options == null) {
+    // TODO: Exclude non-recommended rules.
     return rules;
   }
   const predicates: Array<(rule: LintRule) => boolean> = [];

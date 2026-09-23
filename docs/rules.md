@@ -12,6 +12,11 @@
 - **Description**: Disallows certain fields in `deno.json`.
 - **Tags**:
 
+## `import-allowlist`
+
+- **Description**: Rejects the addition of packages that are not allowed.
+- **Tags**: dependencies
+
 ## `require-allow-list`
 
 - **Description**: Enforces that `--allow-*` flag to have an allow list.

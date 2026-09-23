@@ -53,6 +53,7 @@ export function getAllRules(): Array<LintRule> {
   return [
     banAllowAll,
     noRestrictedFields,
+    importAllowlist,
     requireAllowList,
     requireLockfile,
     requireMinimumDependencyAge,
@@ -81,6 +82,7 @@ const kAllow = "allow" satisfies keyof Exclude<
   boolean | AllowScriptsList
 >;
 const kLock = "lock" satisfies keyof DenoConfigurationFileSchema;
+const kImports = "imports" satisfies keyof DenoConfigurationFileSchema;
 const kMinimumDependencyAge =
   "minimumDependencyAge" satisfies keyof DenoConfigurationFileSchema;
 const kSanitizeOps = "sanitizeOps" as const satisfies keyof NonNullable<
@@ -191,6 +193,10 @@ interface NoRestrictedFieldsOptions {
   fields?: RestrictedFields;
 }
 
+interface ImportAllowlistOptions {
+  allowlist?: Array<string>;
+}
+
 /**
  * Disallows certain fields in `deno.json`.
  */
@@ -221,6 +227,34 @@ export const noRestrictedFields: LintRule<NoRestrictedFieldsOptions> = {
       }
     };
     lintFields(fields);
+  },
+};
+
+/**
+ * Rejects the addition of packages that are not allowed.
+ */
+export const importAllowlist: LintRule<ImportAllowlistOptions> = {
+  id: "import-allowlist",
+  tags: ["dependencies"],
+  paths: () => [[kImports]],
+  defaultOptions: {},
+  lint(reporter, node) {
+    if (node == null) return;
+    const allowedImports = reporter.options.allowlist ?? [];
+    if (allowedImports.length === 0) return;
+    const imports = getNodeValue(node);
+    if (imports == null) return;
+    for (const x of Object.keys(imports)) {
+      const isAllowed = allowedImports.includes(x);
+      if (isAllowed) continue;
+
+      const importPropertyNode = findNodeAtLocation(node, [x])?.parent;
+      if (importPropertyNode == null) continue;
+      reporter.report({
+        message: `\`${x}\` is not allowed`,
+        node: importPropertyNode,
+      });
+    }
   },
 };
 
